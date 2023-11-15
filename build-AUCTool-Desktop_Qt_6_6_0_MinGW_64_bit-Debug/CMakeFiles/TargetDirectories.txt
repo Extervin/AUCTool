@@ -1,9 +1,0 @@
-C:/0-project/project-3/build-AUCTool-Desktop_Qt_6_6_0_MinGW_64_bit-Debug/CMakeFiles/AUCTool.dir
-C:/0-project/project-3/build-AUCTool-Desktop_Qt_6_6_0_MinGW_64_bit-Debug/CMakeFiles/edit_cache.dir
-C:/0-project/project-3/build-AUCTool-Desktop_Qt_6_6_0_MinGW_64_bit-Debug/CMakeFiles/rebuild_cache.dir
-C:/0-project/project-3/build-AUCTool-Desktop_Qt_6_6_0_MinGW_64_bit-Debug/CMakeFiles/list_install_components.dir
-C:/0-project/project-3/build-AUCTool-Desktop_Qt_6_6_0_MinGW_64_bit-Debug/CMakeFiles/install.dir
-C:/0-project/project-3/build-AUCTool-Desktop_Qt_6_6_0_MinGW_64_bit-Debug/CMakeFiles/install/local.dir
-C:/0-project/project-3/build-AUCTool-Desktop_Qt_6_6_0_MinGW_64_bit-Debug/CMakeFiles/install/strip.dir
-C:/0-project/project-3/build-AUCTool-Desktop_Qt_6_6_0_MinGW_64_bit-Debug/CMakeFiles/AUCTool_autogen_timestamp_deps.dir
-C:/0-project/project-3/build-AUCTool-Desktop_Qt_6_6_0_MinGW_64_bit-Debug/CMakeFiles/AUCTool_autogen.dir
