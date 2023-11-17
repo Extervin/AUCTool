@@ -107,7 +107,7 @@ void AUCToolOperations::copy_recursively(const QString &sourceDir, const QString
 
                 if (sourceFile.copy(destinationPath)) {
                     qDebug() << "Copying file: " << sourcePath << " to " << destinationPath;
-                    emit operationStatus("File copied successfully: " + fileName);
+                    emit operationStatus("File " + fileName + " copied successfully to: " + destinationPath);
                 } else {
                     qDebug() << "Error during copying: " << sourcePath;
                     emit operationStatus("Error copying file: " + fileName);
@@ -190,9 +190,9 @@ void AUCToolOperations::clear(const QString &directoryPath, const QString &ignor
 }
 
 void AUCToolOperations::addTo7zFromDirectory(const QString &sourceDir, const QString &archiveListFile, const QString &outputDir, QProgressDialog *progressDialog) {
-    // Путь к исполняемому файлу 7-Zip (пример для Windows)
+    // Путь к исполняемому файлу 7-Zip
     QString sevenZipProgram = QCoreApplication::applicationDirPath() + "/7z/7z.exe";
-    emit operationStatus("Starting archivation...");
+    emit operationStatus("Starting operation...");
 
     QString timestamp = QDateTime::currentDateTime().toString("dd.MM.yyyy-hh.mm");
     QString archiveFileName = timestamp + ".7z";
@@ -223,22 +223,48 @@ void AUCToolOperations::addTo7zFromDirectory(const QString &sourceDir, const QSt
 
     // Копируем только файлы из списка во временную директорию
     foreach (const QString &fileName, filesToCopy) {
-        QString sourceFilePath = sourceDir + "/" + fileName;
-        QString tempFilePath = tempDirPath + "/" + fileName;
-
-        if (!QFile::copy(sourceFilePath, tempFilePath)) {
-            // Обработка ошибок при копировании файла
-            emit operationStatus("Error copying file: " + fileName);
+        // Проверяем, была ли отменена операция
+        if (progressDialog->wasCanceled()) {
+            emit operationStatus("Archiving canceled");
+            tempDir.removeRecursively(); // Удаляем временную директорию в случае отмены операции
             return;
         }
+
+        QString sourceFilePath = sourceDir + "/" + fileName;
+        QString tempFilePath = tempDirPath + "/" + fileName;
+        emit operationStatus("Copy file: " + fileName);
+        // Проверяем, существует ли файл в директории, прежде чем его копировать
+        if (QFile::exists(sourceFilePath)) {
+            if (!QFile::copy(sourceFilePath, tempFilePath)) {
+                // Обработка ошибок при копировании файла
+                emit operationStatus("Error copying file: " + fileName);
+            }
+        } else {
+            // Обработка случая отсутствия файла в директории
+            emit operationStatus("File does not exist in the directory: " + fileName + ", countinue...");
+        }
     }
+
 
     // Команда для создания архива 7z из временной директории
     QString command = QString("\"%1\" a \"%2\" %3").arg(sevenZipProgram, fullOutputPath, tempDirPath);
 
     QProcess process;
     process.start(command);
-    process.waitForFinished(-1);
+    while (!process.waitForFinished(100)) {
+        if (progressDialog->wasCanceled()) {
+            process.kill(); // Принудительно завершаем процесс архивации
+            tempDir.removeRecursively(); // Удаляем временную директорию
+            emit operationStatus("Archiving canceled");
+            return;
+        }
+    }
+
+    if (progressDialog->wasCanceled()) {
+        emit operationStatus("Archiving canceled");
+        tempDir.removeRecursively(); // Удаляем временную директорию в случае отмены операции
+        return;
+    }
 
     if (process.exitCode() == 0) {
         // Архивация успешно завершена
@@ -254,7 +280,21 @@ void AUCToolOperations::addTo7zFromDirectory(const QString &sourceDir, const QSt
     emit operationStatus("Temporary files were deleted successfully");
 }
 
+void AUCToolOperations::cancelArchivingOperation() {
+    QProcess localProcess;
+    localProcess.setProcessChannelMode(QProcess::MergedChannels); // Перенаправляем вывод для корректной отмены
 
+    if (localProcess.state() == QProcess::NotRunning) {
+        return;
+    }
+
+    if (localProcess.state() == QProcess::Running) {
+        localProcess.start("taskkill", QStringList() << "/F" << "/IM" << "7z.exe");
+        localProcess.waitForFinished();
+        emit operationStatus("Archiving operation canceled.");
+        return;
+    }
+}
 
 
 /* void AUCToolOperations::addToZipFromDirectory(const QString &sourceDir, const QString &archiveListFile, const QString &outputDir, QProgressDialog *progressDialog) {

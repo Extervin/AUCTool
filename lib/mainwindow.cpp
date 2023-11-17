@@ -106,13 +106,12 @@ void MainWindow::on_archiveButton_clicked()
     progressDialog.setAutoClose(true);
     progressDialog.setAutoReset(true);
 
+    connect(&progressDialog, &QProgressDialog::canceled, [&]() {
+        emit cancelArchiving(); // Emit a signal to cancel archiving operation
+    });
+
     QEventLoop loop;
     QFutureWatcher<void> *watcher = new QFutureWatcher<void>(this);
-
-    connect(&progressDialog, &QProgressDialog::canceled, [&]() {
-        watcher->cancel();  // Отменяем асинхронную операцию при отмене диалога
-        loop.quit();  // Выходим из цикла, чтобы разблокировать приложение
-    });
 
     connect(watcher, &QFutureWatcher<void>::finished, [&]() {
         progressDialog.hide();  // Скрываем диалог после завершения архивации
@@ -129,6 +128,9 @@ void MainWindow::on_archiveButton_clicked()
 
     // Запускаем архивацию в отдельном потоке
     QFuture<void> future = QtConcurrent::run([&, sourceDirectory, archiveListFile, outputDirectory, &progressDialog]() {
+        // Connect the signal from MainWindow to the operation
+        connect(this, &MainWindow::cancelArchiving, &tool, &AUCToolOperations::cancelArchivingOperation);
+
         tool.addTo7zFromDirectory(sourceDirectory, archiveListFile, outputDirectory, &progressDialog);
     });
 
@@ -137,25 +139,6 @@ void MainWindow::on_archiveButton_clicked()
     // Блокируем приложение до завершения операции или отмены
     loop.exec();
 }
-
-void MainWindow::on_showIgnoreButton_clicked()
-{
-    QString ignoreListPath = appDirPath + "/cfg/ignore.txt";
-
-    QFile file(ignoreListPath);
-
-    if (!file.open(QIODevice::ReadOnly | QIODevice::Text)) {
-        QMessageBox::critical(this, "Error", "Failed to open ignore.txt");
-        return;
-    }
-
-    QTextStream in(&file);
-    QString ignoreContent = in.readAll();
-    file.close();
-
-    ui->debugConsole->setPlainText(ignoreContent);
-}
-
 
 void MainWindow::on_actionSettings_triggered()
 {

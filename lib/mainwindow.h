@@ -16,6 +16,9 @@ class MainWindow : public QMainWindow
 {
     Q_OBJECT
 
+signals:
+    void cancelArchiving();
+
 public:
     MainWindow(QWidget *parent = nullptr);
     ~MainWindow();
@@ -32,8 +35,6 @@ private slots:
     void on_updateButton_clicked();
 
     void on_archiveButton_clicked();
-
-    void on_showIgnoreButton_clicked();
 
     void on_actionSettings_triggered();
 

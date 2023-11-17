@@ -319,7 +319,9 @@ void SettingsDialog::on_addIgnoredFolderButton_clicked()
         // Обработка выбранной папки
         if (!directory.isEmpty())
         {
-            ui->ignoreTXT->insertPlainText(directory + "\n");
+            QDir dir(directory);
+            QString folderName = dir.dirName(); // Получаем имя последней папки
+            ui->ignoreTXT->insertPlainText(folderName + "\n"); // Добавляем только имя папки
         }
     } else {
         QString directory = QFileDialog::getExistingDirectory(this, "Select Ignored Directories", QDir::homePath(), QFileDialog::ShowDirsOnly);
@@ -327,7 +329,9 @@ void SettingsDialog::on_addIgnoredFolderButton_clicked()
         // Обработка выбранной папки
         if (!directory.isEmpty())
         {
-            ui->ignoreTXT->insertPlainText(directory + "\n");
+            QDir dir(directory);
+            QString folderName = dir.dirName(); // Получаем имя последней папки
+            ui->ignoreTXT->insertPlainText(folderName + "\n"); // Добавляем только имя папки
         }
     }
 }

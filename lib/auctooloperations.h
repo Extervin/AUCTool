@@ -7,6 +7,7 @@
 #include "qobject.h"
 #include "qobjectdefs.h"
 #include <QCoreApplication>
+#include <QProcess>
 
 class AUCToolOperations : public QObject {
     Q_OBJECT
@@ -14,6 +15,8 @@ public:
     AUCToolOperations();
 signals:
     void operationStatus(const QString& status);
+public slots:
+    void cancelArchivingOperation();
 
 public:
     void update(const QString& sourceDir, const QString& destinationDir);
@@ -28,6 +31,8 @@ public:
 private:
     QString appDirPath = QCoreApplication::applicationDirPath();
     QString settingsPath = appDirPath + "/cfg/settings.ini";
+    QProcess process;
 };
+
 
 #endif // AUCTOOLOPERATIONS_H
