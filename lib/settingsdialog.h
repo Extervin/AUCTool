@@ -69,6 +69,7 @@ private:
     Ui::SettingsDialog *ui;
     QString appDirPath = QCoreApplication::applicationDirPath();
     QString settingsPath = appDirPath + "/cfg/settings.ini";
+
 };
 
 #endif // SETTINGSDIALOG_H

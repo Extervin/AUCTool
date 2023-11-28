@@ -273,12 +273,20 @@ li.checked::marker { content: &quot;\2612&quot;; }
     <addaction name="separator"/>
     <addaction name="actionExit"/>
    </widget>
+   <widget class="QMenu" name="menuWigets">
+    <property name="title">
+     <string>Wigets</string>
+    </property>
+    <addaction name="actionServer_Update"/>
+   </widget>
    <addaction name="menuMenu"/>
+   <addaction name="menuWigets"/>
   </widget>
   <widget class="QStatusBar" name="statusbar"/>
   <action name="actionSettings">
    <property name="icon">
-    <iconset theme="applications-utilities"/>
+    <iconset theme="applications-utilities">
+     <normaloff>.</normaloff>.</iconset>
    </property>
    <property name="text">
     <string>Settings</string>
@@ -293,6 +301,14 @@ li.checked::marker { content: &quot;\2612&quot;; }
    </property>
    <property name="shortcut">
     <string>Ctrl+Q</string>
+   </property>
+  </action>
+  <action name="actionServer_Update">
+   <property name="text">
+    <string>Server  Update</string>
+   </property>
+   <property name="shortcut">
+    <string>Ctrl+U</string>
    </property>
   </action>
  </widget>

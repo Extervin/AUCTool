@@ -1,6 +1,7 @@
 #include "auctooloperations.h"
 #include "mainwindow.h"
 #include "ui_mainwindow.h"
+#include "serverupdate.h"
 #include <QFileDialog>
 #include <QMessageBox>
 #include <QFile>
@@ -19,16 +20,19 @@ MainWindow::MainWindow(QWidget *parent)
 {
     ui->setupUi(this);
 
-    settingsDialog = new SettingsDialog(this);
-    connect(&tool, &AUCToolOperations::operationStatus, this, &MainWindow::updateDebugConsole);
 
+    settingsDialog = new SettingsDialog(this);
+
+    connect(&tool, &AUCToolOperations::operationStatus, this, &MainWindow::updateDebugConsole);
     // Подключаем сигнал для открытия окна настроек
     connect(ui->actionSettings, &QAction::triggered, this, &MainWindow::on_actionSettings_triggered);
     // signal for updating txt info
     connect(settingsDialog, &SettingsDialog::settingsChanged, this, &MainWindow::updateinfo);
 
     updateinfo();
+
 }
+
 
 MainWindow::~MainWindow()
 {
@@ -151,4 +155,29 @@ void MainWindow::on_actionSettings_triggered()
 void MainWindow::on_actionExit_triggered()
 {
     QCoreApplication::quit();
+}
+
+void MainWindow::on_actionServer_Update_triggered()
+{
+    // Создаем новый виджет ServerUpdate
+    ServerUpdate *serverUpdateWidget = new ServerUpdate(this);
+
+    // Создаем новое главное окно и устанавливаем виджет как его центральный виджет
+    QMainWindow *serverUpdateWindow = new QMainWindow(this);
+    serverUpdateWindow->setCentralWidget(serverUpdateWidget);
+
+    // Устанавливаем флаг удаления при закрытии для виджета ServerUpdate
+    serverUpdateWidget->setAttribute(Qt::WA_DeleteOnClose);
+
+    // Устанавливаем размеры окна и другие необходимые параметры
+    serverUpdateWindow->resize(737, 459);
+    serverUpdateWindow->setWindowTitle("Server Manager");
+
+    // Подключаем слот, который будет удалять объект виджета после его закрытия
+    connect(serverUpdateWidget, &ServerUpdate::destroyed, this, [serverUpdateWindow]() {
+        serverUpdateWindow->deleteLater(); // Удаляем главное окно после уничтожения виджета
+    });
+
+    // Отображаем новое окно
+    serverUpdateWindow->show();
 }

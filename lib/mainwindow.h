@@ -6,11 +6,14 @@
 #include "auctooloperations.h"
 #include "settingsdialog.h"
 #include "ui_mainwindow.h"
+#include "serverupdate.h"
 #include <QSettings>
 
 QT_BEGIN_NAMESPACE
 namespace Ui { class MainWindow; }
 QT_END_NAMESPACE
+
+class ServerUpdate;
 
 class MainWindow : public QMainWindow
 {
@@ -44,6 +47,8 @@ private slots:
 
     void updateinfo();
 
+    void on_actionServer_Update_triggered();
+
 private:
     Ui::MainWindow *ui;
     AUCToolOperations tool;
@@ -51,6 +56,7 @@ private:
     QString appDirPath = QCoreApplication::applicationDirPath();
     QString settingsPath = appDirPath + "/cfg/settings.ini";
     SettingsDialog *settingsDialog;
+    ServerUpdate *serverUpdateWidget;
     //variables for deleting
     QString ignoreListPath = appDirPath + "/cfg/ignore.txt";
     QString archiveListPath = appDirPath + "/cfg/archive.txt";

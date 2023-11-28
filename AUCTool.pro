@@ -7,17 +7,20 @@ CONFIG += c++17
 #DEFINES += QT_DISABLE_DEPRECATED_BEFORE=0x060000    # disables all the APIs deprecated before Qt 6.0.0
 
 SOURCES += \
+    lib/serverupdate.cpp \
     lib\auctooloperations.cpp \
     lib\settingsdialog.cpp \
     lib\main.cpp \
     lib\mainwindow.cpp
 
 HEADERS += \
+    lib/serverupdate.h \
     lib\auctooloperations.h \
     lib\settingsdialog.h \
     lib\mainwindow.h
 
 FORMS += \
+    lib/serverupdate.ui \
     lib\settingsdialog.ui \
     lib\mainwindow.ui
 
