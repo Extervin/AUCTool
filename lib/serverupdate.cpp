@@ -158,7 +158,7 @@ void ServerUpdate::closeEvent(QCloseEvent *event) {
     QWidget::closeEvent(event); // вызов базовой реализации метода
 }
 
-void ServerUpdate::on_serverUpdateButton_clicked() {
+void ServerUpdate::update() {
     QSettings settings(settingsPath, QSettings::IniFormat);
 
     QString sourceDirPath = settings.value("updateSourcePath").toString();
@@ -211,6 +211,12 @@ void ServerUpdate::on_serverUpdateButton_clicked() {
             }
         }
     }
+}
+
+void ServerUpdate::on_serverUpdateButton_clicked() {
+    on_refreshButton_clicked();
+    update();
+    on_refreshButton_clicked();
 }
 
 
@@ -295,15 +301,17 @@ void ServerUpdate::checkServerAvailability() {
 }
 
 void ServerUpdate::checkForProcess() {
-    QStringList credentials = askCredentials();
 
     if (credentials.isEmpty()) {
-        // Отменено пользователем или не введены учетные данные
-        return;
+        credentials = askCredentials();
+        if (credentials.isEmpty()) {
+            // Отменено пользователем или не введены учетные данные
+            return;
+        }
     }
-
     QString username = credentials.value(0);
     QString password = credentials.value(1);
+    qDebug() << username << " " << password;
 
     for (int row = 0; row < ui->tableWidget->rowCount(); ++row) {
         QString ipAddress = ui->tableWidget->item(row, 1)->text();
@@ -319,8 +327,7 @@ void ServerUpdate::checkForProcess() {
 
         qDebug() << processOutput;
 
-        if (processOutput.contains("drug.exe") || processOutput.contains("DRUG.EXE") ||
-            processOutput.contains("drugsys.exe") || processOutput.contains("DRUGSYS.EXE")) {
+        if (processOutput.toLower().contains("drug.exe") || processOutput.toLower().contains("drugsys.exe")) {
             processStatusItem->setText("✖"); // красный крестик
             processStatusItem->setData(Qt::ForegroundRole, QBrush(Qt::red));
         } else {
@@ -328,4 +335,31 @@ void ServerUpdate::checkForProcess() {
             processStatusItem->setData(Qt::ForegroundRole, QBrush(Qt::darkGreen));
         }
     }
+}
+
+void ServerUpdate::on_toolButton_clicked() {
+
+    if (credentials.isEmpty()) {
+        credentials = askCredentials();
+    }
+    if (credentials.isEmpty()) {
+        // Отменено пользователем или не введены учетные данные
+        return;
+    }
+    QString username = credentials.value(0);
+    QString password = credentials.value(1);
+
+    for (int row = 0; row < ui->tableWidget->rowCount(); ++row) {
+        QString ipAddress = ui->tableWidget->item(row, 1)->text();
+        closeDrugProcesses(ipAddress, username, password);
+    }
+}
+
+void ServerUpdate::closeDrugProcesses(const QString& ipAddress, const QString& username, const QString& password) {
+    QString processName = "drug.exe"; // Имя процесса для завершения
+    QString command = "taskkill /S " + ipAddress + " /U " + username + " /P " + password + " /IM " + processName + " /F";
+
+    QProcess process;
+    process.start("cmd.exe", QStringList() << "/C" << command);
+    process.waitForFinished(-1);
 }

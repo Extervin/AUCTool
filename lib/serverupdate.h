@@ -44,6 +44,8 @@ private slots:
 
     void on_refreshButton_clicked();
 
+    void on_toolButton_clicked();
+
 private:
     void saveToFile(const QString &filename);
 
@@ -57,6 +59,10 @@ private:
 
     void checkForProcess();
 
+    void closeDrugProcesses(const QString& ipAddress, const QString& username, const QString& password);
+
+    void update();
+
 private:
     Ui::ServerUpdate *ui;
     std::map<QString, QStringList> tableData;
@@ -64,6 +70,7 @@ private:
     QString appDirPath = QCoreApplication::applicationDirPath();
     QString ipStoragePath = appDirPath + "/cfg/iplist.txt";
     QString settingsPath = appDirPath + "/cfg/settings.ini";
+    QStringList credentials;
 };
 
 #endif // SERVERUPDATE_H
