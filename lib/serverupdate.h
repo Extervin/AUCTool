@@ -8,6 +8,7 @@
 #include <QTableView>
 #include <QKeyEvent>
 #include <map>
+#include <quazip.h>
 
 namespace Ui {
 class ServerUpdate;
@@ -62,6 +63,26 @@ private:
     void closeDrugProcesses(const QString& ipAddress, const QString& username, const QString& password);
 
     void update();
+
+    void createUpdateArchive(const QString &sourceDir);
+
+    void addFilesToArchive(const QString &sourceDir, QuaZip &zip, const QString &dirPath = "");
+
+    void killtask();
+
+    void debugmessage(const QString& message);
+
+    void extractArchive(const QString &sourceFilePath, const QString &tempDirPath);
+
+    void copyArchive(const QString &sourceFilePath, const QString &destinationDirPath);
+
+    void extractZipArchiveToTemp(const QString &sourceFilePath, const QString &tempDirPath);
+
+    void copyTempToAllSubdirectories(const QString &tempDirPath, const QString &targetDirPath);
+
+    void deleteArchiveAndTemp(const QString &sourceFilePath, const QString &tempDirPath);
+
+    void copyArchiveToIP(const QString &sourceFilePath, const QString &destinationDirPath);
 
 private:
     Ui::ServerUpdate *ui;

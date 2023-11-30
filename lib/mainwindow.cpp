@@ -170,7 +170,7 @@ void MainWindow::on_actionServer_Update_triggered()
     serverUpdateWidget->setAttribute(Qt::WA_DeleteOnClose);
 
     // Устанавливаем размеры окна и другие необходимые параметры
-    serverUpdateWindow->resize(737, 459);
+    serverUpdateWindow->resize(657, 460);
     serverUpdateWindow->setWindowTitle("Server Manager");
 
     // Подключаем слот, который будет удалять объект виджета после его закрытия

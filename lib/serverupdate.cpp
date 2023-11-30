@@ -19,6 +19,8 @@
 #include <QFormLayout>
 #include <QSettings>
 #include <QDirIterator>
+#include <quazip.h>
+#include <quazipfile.h>
 
 ServerUpdate::ServerUpdate(QWidget *parent) :
     QWidget(parent),
@@ -34,6 +36,8 @@ ServerUpdate::ServerUpdate(QWidget *parent) :
 
     connect(this, &QObject::destroyed, this, &ServerUpdate::saveAndClose);
 
+    ui->tableWidget->setSortingEnabled(true);
+
     loadFromFile(ipStoragePath);
 
     connect(ui->tableWidget, &QTableWidget::cellChanged, this, &ServerUpdate::on_tableWidget_cellChanged);
@@ -48,22 +52,6 @@ void ServerUpdate::on_tableWidget_cellChanged(int row, int column)
 {
     saveToFile(ipStoragePath);
 }
-
-//void ServerUpdate::updateAll() {
-
-//}
-
-//void ServerUpdate::processCheck() {
-
-//}
-
-//void ServerUpdate::countFolders() {
-
-//}
-
-//void ServerUpdate::versionCheck() {
-
-//}
 
 void ServerUpdate::saveToFile(const QString &filename)
 {
@@ -158,12 +146,137 @@ void ServerUpdate::closeEvent(QCloseEvent *event) {
     QWidget::closeEvent(event); // вызов базовой реализации метода
 }
 
+void ServerUpdate::extractZipArchiveToTemp(const QString &sourceFilePath, const QString &tempDirPath) {
+    QuaZip zip(sourceFilePath);
+    if (!zip.open(QuaZip::mdUnzip)) {
+        qDebug() << "Failed to open ZIP archive for extraction.";
+        return;
+    }
+
+    QDir tempDir(tempDirPath);
+    if (!tempDir.exists() && !tempDir.mkpath(".")) {
+        qDebug() << "Failed to create temp directory: " << tempDirPath;
+        return;
+    }
+
+    QuaZipFileInfo info;
+    QuaZipFile file(&zip);
+    for (bool more = zip.goToFirstFile(); more; more = zip.goToNextFile()) {
+        if (!zip.getCurrentFileInfo(&info)) {
+            qDebug() << "Failed to get current file info from ZIP archive.";
+            return;
+        }
+
+        QString filePath = tempDirPath + "/" + info.name;
+        QFile outFile(filePath);
+        if (!outFile.open(QIODevice::WriteOnly)) {
+            qDebug() << "Failed to open output file for extraction.";
+            return;
+        }
+
+        file.setFileName(info.name);
+        if (!file.open(QIODevice::ReadOnly)) {
+            qDebug() << "Failed to open file in ZIP archive.";
+            outFile.close();
+            return;
+        }
+
+        outFile.write(file.readAll());
+        file.close();
+        outFile.close();
+    }
+
+    zip.close();
+    qDebug() << "Extracted ZIP archive:" << sourceFilePath << "to" << tempDirPath;
+}
+
+
+void ServerUpdate::copyTempToAllSubdirectories(const QString &tempDirPath, const QString &targetDirPath) {
+    QDir tempDir(tempDirPath);
+    QDir targetDir(targetDirPath);
+
+    if (!tempDir.exists()) {
+        qDebug() << "Temp directory does not exist: " << tempDirPath;
+        return;
+    }
+
+    if (!targetDir.exists()) {
+        qDebug() << "Target directory does not exist: " << targetDirPath;
+        return;
+    }
+
+    QStringList subDirectories = targetDir.entryList(QDir::Dirs | QDir::NoDotAndDotDot);
+    foreach (const QString &subDirectory, subDirectories) {
+        QString subDirPath = targetDir.absoluteFilePath(subDirectory);
+        QString destinationPath = subDirPath + "/" + tempDir.dirName();
+
+        QDir destinationDir(destinationPath);
+        if (!destinationDir.exists()) {
+            qDebug() << "Destination directory does not exist: " << destinationPath;
+            continue;
+        }
+
+        QDirIterator it(tempDirPath, QDir::Files | QDir::NoDotAndDotDot, QDirIterator::Subdirectories);
+        while (it.hasNext()) {
+            it.next();
+            QString sourceFilePath = it.filePath();
+            QString destinationFilePath = destinationPath + "/" + it.fileName();
+
+            if (!QFile::copy(sourceFilePath, destinationFilePath)) {
+                qDebug() << "Failed to copy file:" << sourceFilePath << "to" << destinationFilePath;
+                continue;
+            }
+            qDebug() << "Copied file:" << sourceFilePath << "to" << destinationFilePath;
+        }
+    }
+}
+
+void ServerUpdate::deleteArchiveAndTemp(const QString &sourceFilePath, const QString &tempDirPath) {
+    QFile archive(sourceFilePath);
+    QDir tempDir(tempDirPath);
+
+    if (archive.exists()) {
+        archive.remove();
+        qDebug() << "Deleted archive:" << sourceFilePath;
+    }
+
+    if (tempDir.exists()) {
+        tempDir.removeRecursively();
+        qDebug() << "Deleted temp directory:" << tempDirPath;
+    }
+}
+
+void ServerUpdate::copyArchiveToIP(const QString &sourceFilePath, const QString &destinationDirPath) {
+    QFile sourceFile(sourceFilePath);
+
+    if (!sourceFile.exists()) {
+        qDebug() << "Source file does not exist.";
+        return;
+    }
+
+    QDir destinationDir(destinationDirPath);
+    if (!destinationDir.exists()) {
+        qDebug() << "Destination directory does not exist: " << destinationDirPath;
+        return;
+    }
+
+    QString destinationFilePath = destinationDirPath + "/" + QFileInfo(sourceFilePath).fileName();
+    if (!QFile::copy(sourceFilePath, destinationFilePath)) {
+        qDebug() << "Failed to copy file to:" << destinationDirPath;
+        return;
+    }
+
+    qDebug() << "Copied file:" << sourceFilePath << "to" << destinationDirPath;
+}
+
 void ServerUpdate::update() {
+    // Шаг 1: Архивирование обновления
     QSettings settings(settingsPath, QSettings::IniFormat);
 
-    QString sourceDirPath = settings.value("updateSourcePath").toString();
-    QDir sourceDir(sourceDirPath);
+    QString sourceUpdatePath = settings.value("updateSourcePath").toString();
+    createUpdateArchive(sourceUpdatePath);
 
+    // Получаем список IP-адресов из таблицы
     QStringList ipAddresses;
     for (int row = 0; row < ui->tableWidget->rowCount(); ++row) {
         QTableWidgetItem *ipItem = ui->tableWidget->item(row, 1);
@@ -172,49 +285,33 @@ void ServerUpdate::update() {
             ipAddresses << ipAddress;
         }
     }
+    // Шаг 2: Цикл для каждого IP-адреса
+    QString sourceFilePath = sourceUpdatePath + "/update.zip";
 
-    if (!sourceDir.exists()) {
-        qDebug() << "Source directory does not exist.";
-        return;
-    }
+    for (const QString &ipAddress : ipAddresses) {
+        QString destinationDirPath = "\\\\" + ipAddress + "\\d$\\Test\\targetContainer";
+        QString tempDirForIP = destinationDirPath + "\\temp";
+        qDebug() << "Temp directory for IP:" << tempDirForIP;
+        qDebug() << "Source archive path:" << sourceFilePath;
+        qDebug() << "Copying from:" << tempDirForIP << "to:" << destinationDirPath;
+        qDebug() << "Deleting archive:" << sourceFilePath;
+        qDebug() << "Deleting temp directory:" << tempDirForIP;
 
-    QDirIterator it(sourceDirPath, QDir::Files | QDir::NoDotAndDotDot, QDirIterator::Subdirectories);
-    while (it.hasNext()) {
-        it.next();
+        // Копирование архива на IP-адрес
+        copyArchiveToIP(sourceFilePath, destinationDirPath);
 
-        QString sourceFilePath = it.filePath();
+        // Разархивирование архива во временную папку
+        extractZipArchiveToTemp(destinationDirPath + "/" + QFileInfo(sourceFilePath).fileName(), tempDirForIP);
 
-        foreach (const QString &ipAddress, ipAddresses) {
-            QString destinationPath = "\\\\" + ipAddress + "\\d$\\Test\\targetContainer";
+        // Копирование содержимого временной папки в поддиректории
+        copyTempToAllSubdirectories(tempDirForIP, destinationDirPath);
 
-            QDir destinationDir(destinationPath);
-            if (!destinationDir.exists()) {
-                qDebug() << "Destination directory does not exist: " << destinationPath;
-                continue;
-            }
-
-            QDirIterator targetDirs(destinationPath, QDir::Dirs | QDir::NoDotAndDotDot);
-            while (targetDirs.hasNext()) {
-                targetDirs.next();
-
-                QString currentTargetDir = targetDirs.filePath();
-                QString relativePath = it.filePath().mid(sourceDirPath.length());
-
-                QString destinationFilePath = currentTargetDir + "/" + relativePath;
-                QDir destinationFileDir(QFileInfo(destinationFilePath).absolutePath());
-                if (!destinationFileDir.exists()) {
-                    destinationFileDir.mkpath(".");
-                }
-
-                QFile::copy(sourceFilePath, destinationFilePath);
-                qDebug() << "Copied file:" << sourceFilePath << "to" << destinationFilePath;
-            }
-        }
+        // Удаление архива и временной папки
+        deleteArchiveAndTemp(destinationDirPath + "\\update.zip", tempDirForIP);
     }
 }
 
 void ServerUpdate::on_serverUpdateButton_clicked() {
-    on_refreshButton_clicked();
     update();
     on_refreshButton_clicked();
 }
@@ -301,22 +398,22 @@ void ServerUpdate::checkServerAvailability() {
 }
 
 void ServerUpdate::checkForProcess() {
-
-    if (credentials.isEmpty()) {
-        credentials = askCredentials();
-        if (credentials.isEmpty()) {
-            // Отменено пользователем или не введены учетные данные
-            return;
-        }
-    }
     QString username = credentials.value(0);
     QString password = credentials.value(1);
-    qDebug() << username << " " << password;
+
+    if (username.isEmpty() || password.isEmpty()) {
+        credentials = askCredentials();
+        username = credentials.value(0);
+        password = credentials.value(1);
+    }
+    if (username.isEmpty() || password.isEmpty()) {
+        qDebug() << "Не введены учетные данные";
+        return;
+    }
 
     for (int row = 0; row < ui->tableWidget->rowCount(); ++row) {
         QString ipAddress = ui->tableWidget->item(row, 1)->text();
         QString command = "tasklist /S " + ipAddress + " /U " + username + " /P " + password;
-
 
         QProcess process;
         process.start("cmd.exe", QStringList() << "/C" << command);
@@ -338,16 +435,25 @@ void ServerUpdate::checkForProcess() {
 }
 
 void ServerUpdate::on_toolButton_clicked() {
+    QSettings settings(settingsPath, QSettings::IniFormat);
 
-    if (credentials.isEmpty()) {
-        credentials = askCredentials();
-    }
-    if (credentials.isEmpty()) {
-        // Отменено пользователем или не введены учетные данные
-        return;
-    }
+    QString sourceDirectory = settings.value("updateSourcePath").toString();
+    createUpdateArchive(sourceDirectory);
+}
+
+void ServerUpdate::killtask() {
     QString username = credentials.value(0);
     QString password = credentials.value(1);
+
+    if (username.isEmpty() || password.isEmpty()) {
+        credentials = askCredentials();
+        username = credentials.value(0);
+        password = credentials.value(1);
+    }
+    if (username.isEmpty() || password.isEmpty()) {
+        qDebug() << "Не введены учетные данные";
+        return;
+    }
 
     for (int row = 0; row < ui->tableWidget->rowCount(); ++row) {
         QString ipAddress = ui->tableWidget->item(row, 1)->text();
@@ -362,4 +468,74 @@ void ServerUpdate::closeDrugProcesses(const QString& ipAddress, const QString& u
     QProcess process;
     process.start("cmd.exe", QStringList() << "/C" << command);
     process.waitForFinished(-1);
+}
+
+void ServerUpdate::addFilesToArchive(const QString &sourceDir, QuaZip &zip, const QString &dirPath) {
+    QDir directory(sourceDir);
+    directory.setFilter(QDir::Files | QDir::Dirs | QDir::NoDotAndDotDot);
+
+    foreach (const QString &file, directory.entryList()) {
+        QString filePath = sourceDir + "/" + file;
+        QString relativePath = QDir(sourceDir).relativeFilePath(filePath);
+
+        if (!dirPath.isEmpty()) {
+            relativePath = dirPath + "/" + relativePath;
+        }
+
+        QFileInfo fileInfo(filePath);
+        if (fileInfo.isDir()) {
+            QuaZipFile dirFile(&zip);
+            QuaZipNewInfo info(relativePath + "/");
+            if (!dirFile.open(QIODevice::WriteOnly, info)) {
+                qWarning() << "Could not write directory to ZIP: " << filePath;
+                continue;
+            }
+            dirFile.close();
+            addFilesToArchive(filePath, zip, relativePath);
+        } else {
+            // Проверяем, чтобы файл не был созданным архивом
+            if (file != "update.zip") {
+                QuaZipFile outFile(&zip);
+                QuaZipNewInfo info(relativePath);
+                if (!outFile.open(QIODevice::WriteOnly, info)) {
+                    qWarning() << "Could not write file to ZIP: " << filePath;
+                    continue;
+                }
+
+                QFile fileToAdd(filePath);
+                if (!fileToAdd.open(QIODevice::ReadOnly)) {
+                    qWarning() << "Could not open file: " << filePath;
+                    outFile.close();
+                    continue;
+                }
+
+                outFile.write(fileToAdd.readAll());
+
+                outFile.close();
+                fileToAdd.close();
+            }
+        }
+    }
+}
+
+void ServerUpdate::createUpdateArchive(const QString &sourceDir) {
+    QString zipPath = sourceDir + "/update.zip";
+
+    QuaZip zip(zipPath);
+    if (!zip.open(QuaZip::mdCreate)) {
+        qWarning() << "Could not create ZIP archive";
+        return;
+    }
+
+    QStringList excludeFiles;
+    excludeFiles << "update.zip";
+
+    addFilesToArchive(sourceDir, zip);
+    debugmessage("Update package created");
+
+    zip.close();
+}
+
+void ServerUpdate::debugmessage(const QString& message) {
+    ui->debugBrowser->append(message);
 }
