@@ -62,7 +62,7 @@ private:
 
     void closeDrugProcesses(const QString& ipAddress, const QString& username, const QString& password);
 
-    void update();
+    void updateInBackground(const QString& settingsPath);
 
     void createUpdateArchive(const QString &sourceDir);
 
@@ -72,17 +72,17 @@ private:
 
     void debugmessage(const QString& message);
 
-    void extractArchive(const QString &sourceFilePath, const QString &tempDirPath);
-
-    void copyArchive(const QString &sourceFilePath, const QString &destinationDirPath);
-
-    void extractZipArchiveToTemp(const QString &sourceFilePath, const QString &tempDirPath);
-
     void copyTempToAllSubdirectories(const QString &tempDirPath, const QString &targetDirPath);
 
-    void deleteArchiveAndTemp(const QString &sourceFilePath, const QString &tempDirPath);
+    void copyFilesToTemp(const QString &sourceDirPath, const QString &tempDirPath);
 
-    void copyArchiveToIP(const QString &sourceFilePath, const QString &destinationDirPath);
+    void removeTempDirectory(const QString &tempDirPath);
+
+    void updateVersionFile(const QString &sourceDirPath, const QString &targetDirPath);
+
+    void checkVersionMatch(const QString &updateSourcePath);
+
+    void startUpdate();
 
 private:
     Ui::ServerUpdate *ui;
