@@ -197,7 +197,6 @@ void AUCToolOperations::addTo7zFromDirectory(const QString &sourceDir, const QSt
     QString timestamp = QDateTime::currentDateTime().toString("dd.MM.yyyy-hh.mm");
     QString archiveFileName = timestamp + ".7z";
     QString fullOutputPath = outputDir + "/" + archiveFileName;
-    emit operationStatus(outputDir + " " + fullOutputPath);
 
     // Создаем временную директорию
     QString tempDirPath = outputDir + "/temp";
@@ -248,7 +247,7 @@ void AUCToolOperations::addTo7zFromDirectory(const QString &sourceDir, const QSt
 
 
     // Команда для создания архива 7z из временной директории
-    QString command = QString("\"%1\" a \"%2\" \"%3\\*\"").arg(sevenZipProgram, fullOutputPath, tempDirPath);
+    QString command = QString("\"%1\" a \"%2\" %3").arg(sevenZipProgram, fullOutputPath, tempDirPath);
 
     QProcess process;
     process.start(command);

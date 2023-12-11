@@ -63,11 +63,11 @@ private:
 
     QStringList askCredentials();
 
-    void startserverupdate();
+    //void startserverupdate();
 
     void adddebugmessage(const QString& message);
 
-    void refresh();
+    //void refresh();
 
 private:
     Ui::ServerUpdate *ui;
@@ -77,7 +77,7 @@ private:
     QString ipStoragePath = appDirPath + "/cfg/iplist.txt";
     QString settingsPath = appDirPath + "/cfg/settings.ini";
     QStringList credentials;
-    ServerAUCOperations *operation;
+    ServerAUCOperations operation;
 };
 
 #endif // SERVERUPDATE_H

@@ -27,6 +27,7 @@ ServerUpdate::ServerUpdate(QWidget *parent) :
     QWidget(parent),
     ui(new Ui::ServerUpdate)
 {
+    qDebug() << "1";
     ui->setupUi(this);
     ui->tableWidget->setColumnWidth(0, 200);
     ui->tableWidget->setColumnWidth(1, 200);
@@ -34,16 +35,16 @@ ServerUpdate::ServerUpdate(QWidget *parent) :
     ui->tableWidget->setColumnWidth(3, 55);
     ui->tableWidget->setColumnWidth(4, 55);
     ui->tableWidget->setColumnWidth(5, 70);
-
-    //connect(this, &QObject::destroyed, this, &ServerUpdate::saveAndClose);
-
+    qDebug() << "2";
+    connect(this, &QObject::destroyed, this, &ServerUpdate::saveAndClose);
+    qDebug() << "3";
     ui->tableWidget->setSortingEnabled(true);
-
+    qDebug() << "4";
     loadFromFile(ipStoragePath);
-
+    qDebug() << "5";
     connect(ui->tableWidget, &QTableWidget::cellChanged, this, &ServerUpdate::on_tableWidget_cellChanged);
-
-
+    qDebug() << "6";
+    connect(&operation, &ServerAUCOperations::setdebugmessage, this, &ServerUpdate::debugmessage);
 }
 
 ServerUpdate::~ServerUpdate()
@@ -139,7 +140,10 @@ void ServerUpdate::keyPressEvent(QKeyEvent *event) {
 }
 
 void ServerUpdate::saveAndClose() {
-
+    if (!isHidden()) {
+        saveToFile(ipStoragePath);
+        close();
+    }
 }
 
 void ServerUpdate::closeEvent(QCloseEvent *event) {
@@ -175,11 +179,11 @@ QStringList ServerUpdate::askCredentials() {
 
 
 void ServerUpdate::on_serverUpdateButton_clicked() {
-    startserverupdate();
+
 }
 
 void ServerUpdate::on_refreshButton_clicked() {
-    refresh();
+
 }
 
 void ServerUpdate::on_toolButton_clicked() {
@@ -190,7 +194,7 @@ void ServerUpdate::adddebugmessage(const QString& message) {
     ui->debugBrowser->append(message);
 }
 
-void ServerUpdate::startserverupdate() {
+/*void ServerUpdate::startserverupdate() {
     QString username = credentials.value(0);
     QString password = credentials.value(1);
 
@@ -211,7 +215,7 @@ void ServerUpdate::startserverupdate() {
     if (reply == QMessageBox::Yes) {
         for (int row = 0; row < ui->tableWidget->rowCount(); ++row) {
             QString ipAddress = ui->tableWidget->item(row, 1)->text();
-            operation->closeDrugProcesses(ipAddress, username, password);
+            operation.closeDrugProcesses(ipAddress, username, password);
         }
     } else if (reply == QMessageBox::No) {
 
@@ -234,101 +238,19 @@ void ServerUpdate::startserverupdate() {
         }
     }
 
-    qDebug() << ipAddresses << sourceUpdatePath << username << password;
+    operation.updateInBackground(sourceUpdatePath, ipAddresses, username, password);
 
-    operation->updateInBackground(sourceUpdatePath, ipAddresses, username, password);
+} */
 
-}
-
-void ServerUpdate::refresh() {
-
-    QString username = credentials.value(0);
-    QString password = credentials.value(1);
-
-    if (username.isEmpty() || password.isEmpty()) {
-        credentials = askCredentials();
-        username = credentials.value(0);
-        password = credentials.value(1);
-    }
-    if (username.isEmpty() || password.isEmpty()) {
-        qDebug() << "Username or password missing";
-        adddebugmessage("Username or password missing");
-        return;
-    }
-
-    QSettings settings(settingsPath, QSettings::IniFormat);
-
+/*void ServerUpdate::refresh() {
+    QSettings settings(operation.settingsPath, QSettings::IniFormat);
     QString sourceUpdatePath = settings.value("updateSourcePath").toString();
-    std::vector<int> reply;
-    // Получаем список IP-адресов из таблицы
-    for (int row = 0; row < ui->tableWidget->rowCount(); ++row) {
-        QTableWidgetItem* ipItem = ui->tableWidget->item(row, 1);
-        if (ipItem) {
-            QString ipAddress = ipItem->text();
-            //ping - folders - version - process
-            reply = operation->refreshInBackground(sourceUpdatePath, ipAddress, username, password);
-        }
-        if (true) {
 
-        }
-        // Пинг
-        if (reply[0] == 1) {
-            QTableWidgetItem *item = new QTableWidgetItem("✔"); // зеленая галочка
-            item->setForeground(Qt::darkGreen);
-            ui->tableWidget->setItem(row, 3, item); // Указываем номер строки и столбца
-        } else if (reply[0] == 0) {
-            QTableWidgetItem *item = new QTableWidgetItem("✖"); // красный крестик
-            item->setForeground(Qt::red);
-            ui->tableWidget->setItem(row, 3, item); // Указываем номер строки и столбца
-        } else if (reply[0] == 2) {
-            QTableWidgetItem *item = new QTableWidgetItem("err");
-            item->setForeground(Qt::red);
-            ui->tableWidget->setItem(row, 3, item); // Указываем номер строки и столбца
-        }
+    operation.checkVersionMatch(sourceUpdatePath, ui->tableWidget);
+    operation.checkServerAvailability(ui->tableWidget);
+    operation.countFolders(ui->tableWidget);
 
-        // drug.exe
-        if (reply[3] == 1) {
-            QTableWidgetItem *item = new QTableWidgetItem("✔"); // зеленая галочка
-            item->setForeground(Qt::darkGreen);
-            ui->tableWidget->setItem(row, 4, item); // Указываем номер строки и столбца
-        } else if (reply[3] == 0) {
-            QTableWidgetItem *item = new QTableWidgetItem("✖"); // красный крестик
-            item->setForeground(Qt::red);
-            ui->tableWidget->setItem(row, 4, item); // Указываем номер строки и столбца
-        } else if (reply[3] == 2) {
-            QTableWidgetItem *item = new QTableWidgetItem("err");
-            item->setForeground(Qt::red);
-            ui->tableWidget->setItem(row, 4, item); // Указываем номер строки и столбца
-        }
-
-        //folders
-        if (reply[1] == 0) {
-            QTableWidgetItem *item = new QTableWidgetItem("err");
-            item->setForeground(Qt::red);
-            ui->tableWidget->setItem(row, 2, item); // Указываем номер строки и столбца
-        } else {
-            int value = reply[1];
-            QTableWidgetItem *item = new QTableWidgetItem(QString::number(value)); // красный крестик
-            ui->tableWidget->setItem(row, 2, item); // Указываем номер строки и столбца
-        }
-
-        // version
-        if (reply[2] == 1) {
-            QTableWidgetItem *item = new QTableWidgetItem("match");
-            item->setForeground(Qt::darkGreen);
-            ui->tableWidget->setItem(row, 5, item); // Указываем номер строки и столбца
-        } else if (reply[2] == 0) {
-            QTableWidgetItem *item = new QTableWidgetItem("unmatch");
-            item->setForeground(Qt::red);
-            ui->tableWidget->setItem(row, 5, item); // Указываем номер строки и столбца
-        } else if (reply[2] == 2) {
-            QTableWidgetItem *item = new QTableWidgetItem("error");
-            item->setForeground(Qt::red);
-            ui->tableWidget->setItem(row, 5, item); // Указываем номер строки и столбца
-        }
-
-    }
-
-}
-
-
+    QString username = operation.credentials.value(0);
+    QString password = operation.credentials.value(1);
+    operation.checkForProcess(username, password, ui->tableWidget);
+}*/

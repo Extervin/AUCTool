@@ -14,17 +14,15 @@ public:
 
     void updateInBackground(const QString& sourcePath, const QStringList& ipAddresses, const QString& username, const QString& password);
 
-    int countFolders();
+    void countFolders(QTableWidget* tableWidget);
 
-    int checkServerAvailability(QString ipAddress);
+    void checkServerAvailability(QTableWidget* tableWidget);
 
-    int checkForProcess(const QString& username, const QString& password, QString ipAddress);
+    void checkForProcess(const QString& username, const QString& password, QTableWidget* tableWidget);
 
-    int checkVersionMatch(const QString& updateSourcePath);
+    void checkVersionMatch(const QString& updateSourcePath, QTableWidget* tableWidget);
 
     void closeDrugProcesses(const QString& ipAddress, const QString& username, const QString& password);
-
-    std::vector<int> refreshInBackground(const QString& sourcePath, const QString &ipAddresses, const QString& username, const QString& password);
 
 signals:
     void setdebugmessage(const QString& message);
