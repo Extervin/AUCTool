@@ -46,11 +46,7 @@ ServerUpdate::ServerUpdate(QWidget *parent) :
 
     connect(ui->tableWidget, &QTableWidget::cellChanged, this, &ServerUpdate::on_tableWidget_cellChanged);
 
-    // В конструкторе или методе инициализации ServerUpdate:
-
-
     connect(operation, &ServerAUCOperations::sendDebugMessage, this, &ServerUpdate::receiveDebugMessage);
-
 }
 
 ServerUpdate::~ServerUpdate()
@@ -91,7 +87,6 @@ void ServerUpdate::saveToFile(const QString &filename)
         }
         out << rowData.trimmed() << "\n";
     }
-
     file.close();
 }
 
@@ -116,7 +111,6 @@ void ServerUpdate::loadFromFile(const QString& filePath) {
             QTableWidgetItem *item = new QTableWidgetItem(parts[col]);
             ui->tableWidget->setItem(row, col+1, item);
         }
-
         // Вставка чекбокса в нулевую колонку
         QTableWidgetItem *checkBoxItem = new QTableWidgetItem();
         checkBoxItem->setFlags(Qt::ItemIsUserCheckable | Qt::ItemIsEnabled);
@@ -228,7 +222,7 @@ void ServerUpdate::startserverupdate() {
             operation->closeDrugProcesses(ipAddress, username, password);
             QCoreApplication::processEvents();
             // Ждем некоторое время перед следующим обновлением
-            QThread::msleep(100); // Например, 100 миллисекунд
+            QThread::msleep(10);
         }
     } else if (reply == QMessageBox::No) {
 
@@ -259,7 +253,7 @@ void ServerUpdate::startserverupdate() {
 
     QCoreApplication::processEvents();
     // Ждем некоторое время перед следующим обновлением
-    QThread::msleep(100); // Например, 100 миллисекунд
+    QThread::msleep(100);
 
 }
 
@@ -297,62 +291,62 @@ void ServerUpdate::refresh() {
             }
             // Пинг
             if (reply[0] == 1) {
-                QTableWidgetItem *item = new QTableWidgetItem("✔"); // зеленая галочка
+                QTableWidgetItem *item = new QTableWidgetItem("✔");
                 item->setForeground(Qt::darkGreen);
-                ui->tableWidget->setItem(row, 4, item); // Указываем номер строки и столбца
+                ui->tableWidget->setItem(row, 4, item);
             } else if (reply[0] == 0) {
-                QTableWidgetItem *item = new QTableWidgetItem("✖"); // красный крестик
+                QTableWidgetItem *item = new QTableWidgetItem("✖");
                 item->setForeground(Qt::red);
-                ui->tableWidget->setItem(row, 4, item); // Указываем номер строки и столбца
+                ui->tableWidget->setItem(row, 4, item);
             } else if (reply[0] == 2) {
                 QTableWidgetItem *item = new QTableWidgetItem("err");
                 item->setForeground(Qt::red);
-                ui->tableWidget->setItem(row, 4, item); // Указываем номер строки и столбца
+                ui->tableWidget->setItem(row, 4, item);
             }
 
             // drug.exe
             if (reply[3] == 0) {
-                QTableWidgetItem *item = new QTableWidgetItem("✔"); // зеленая галочка
+                QTableWidgetItem *item = new QTableWidgetItem("✔");
                 item->setForeground(Qt::darkGreen);
-                ui->tableWidget->setItem(row, 5, item); // Указываем номер строки и столбца
+                ui->tableWidget->setItem(row, 5, item);
             } else if (reply[3] == 1) {
-                QTableWidgetItem *item = new QTableWidgetItem("✖"); // красный крестик
+                QTableWidgetItem *item = new QTableWidgetItem("✖");
                 item->setForeground(Qt::red);
-                ui->tableWidget->setItem(row, 5, item); // Указываем номер строки и столбца
+                ui->tableWidget->setItem(row, 5, item);
             } else if (reply[3] == 2) {
                 QTableWidgetItem *item = new QTableWidgetItem("err");
                 item->setForeground(Qt::red);
-                ui->tableWidget->setItem(row, 5, item); // Указываем номер строки и столбца
+                ui->tableWidget->setItem(row, 5, item);
             }
 
             //folders
             if (reply[1] == 0) {
                 QTableWidgetItem *item = new QTableWidgetItem("err");
                 item->setForeground(Qt::red);
-                ui->tableWidget->setItem(row, 3, item); // Указываем номер строки и столбца
+                ui->tableWidget->setItem(row, 3, item);
             } else {
                 int value = reply[1];
-                QTableWidgetItem *item = new QTableWidgetItem(QString::number(value)); // красный крестик
-                ui->tableWidget->setItem(row, 3, item); // Указываем номер строки и столбца
+                QTableWidgetItem *item = new QTableWidgetItem(QString::number(value));
+                ui->tableWidget->setItem(row, 3, item);
             }
 
             // version
             if (reply[2] == 1) {
                 QTableWidgetItem *item = new QTableWidgetItem("match");
                 item->setForeground(Qt::darkGreen);
-                ui->tableWidget->setItem(row, 6, item); // Указываем номер строки и столбца
+                ui->tableWidget->setItem(row, 6, item);
             } else if (reply[2] == 0) {
                 QTableWidgetItem *item = new QTableWidgetItem("unmatch");
                 item->setForeground(Qt::red);
-                ui->tableWidget->setItem(row, 6, item); // Указываем номер строки и столбца
+                ui->tableWidget->setItem(row, 6, item);
             } else if (reply[2] == 2) {
                 QTableWidgetItem *item = new QTableWidgetItem("error");
                 item->setForeground(Qt::red);
-                ui->tableWidget->setItem(row, 6, item); // Указываем номер строки и столбца
+                ui->tableWidget->setItem(row, 6, item);
             }
             QCoreApplication::processEvents();
             // Ждем некоторое время перед следующим обновлением
-            QThread::msleep(100); // Например, 100 миллисекунд
+            QThread::msleep(10);
         }
     }
 }

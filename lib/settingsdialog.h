@@ -65,6 +65,10 @@ private slots:
 
     void on_addIgnoredFileButton_clicked();
 
+    void on_serverUpdateTargetPath_textChanged(const QString &arg1);
+
+    void on_checkServerTargetPath_clicked();
+
 private:
     Ui::SettingsDialog *ui;
     QString appDirPath = QCoreApplication::applicationDirPath();

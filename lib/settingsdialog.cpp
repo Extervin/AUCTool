@@ -42,7 +42,6 @@ void SettingsDialog::loadArchiveFile(const QString &filePath)
         QString fileContents = in.readAll();
         file.close();
 
-        // Теперь у вас есть содержимое файла, и вы можете его отобразить в QTextEdit
         ui->archiveTXT->setText(fileContents);
     }
 
@@ -56,6 +55,7 @@ void SettingsDialog::loadSettings() {
     ui->updateSourcePath->setText(settings.value("updateSourcePath", "").toString());
     ui->updateTargetPath->setText(settings.value("updateTargetPath", "").toString());
     ui->cleaningPath->setText(settings.value("cleaningPath", "").toString());
+    ui->serverUpdateTargetPath->setText(settings.value("serverUpdatePath", "").toString());
 }
 
 void SettingsDialog::applySetting(QLineEdit* lineEdit, const QString& settingsKey) {
@@ -99,10 +99,8 @@ void SettingsDialog::on_chooseTargetButton_clicked()
 
 void SettingsDialog::on_addArchivatedFileButton_clicked()
 {
-    // Получаем текст из QLineEdit
     QString customPath = ui->archivatingPath->text();
 
-    // Если пользователь ввел не пустую строку
     if (!customPath.isEmpty()) {
         QStringList fileNames = QFileDialog::getOpenFileNames(this, "Select Files to Archive", customPath);
 
@@ -111,7 +109,6 @@ void SettingsDialog::on_addArchivatedFileButton_clicked()
             QFileInfo fileInfo(fileName);
             QString baseName = fileInfo.fileName();
 
-            // Добавляем имя файла в QTextEdit
             ui->archiveTXT->insertPlainText(baseName + "\n");
         }
     } else {
@@ -122,7 +119,6 @@ void SettingsDialog::on_addArchivatedFileButton_clicked()
             QFileInfo fileInfo(fileName);
             QString baseName = fileInfo.fileName();
 
-            // Добавляем имя файла в QTextEdit
             ui->archiveTXT->insertPlainText(baseName + "\n");
         }
     }
@@ -146,6 +142,7 @@ void SettingsDialog::on_applyButton_clicked()
     applySetting(ui->updateSourcePath, "updateSourcePath");
     applySetting(ui->updateTargetPath, "updateTargetPath");
     applySetting(ui->cleaningPath, "cleaningPath");
+    applySetting(ui->serverUpdateTargetPath, "serverUpdatePath");
     saveArchiveToFile();
     saveIgnoredToFile();
     QMessageBox::information(this, "Settings Applied", "Settings applied successfully!");
@@ -199,10 +196,8 @@ void SettingsDialog::on_chooseCleaningPathButton_clicked()
 
 void SettingsDialog::on_addIgnoredFileButton_clicked()
 {
-        // Получаем текст из QLineEdit
         QString customPath = ui->cleaningPath->text();
 
-        // Если пользователь ввел не пустую строку
         if (!customPath.isEmpty()) {
             QStringList fileNames = QFileDialog::getOpenFileNames(this, "Select Ignored Files", customPath);
 
@@ -211,7 +206,6 @@ void SettingsDialog::on_addIgnoredFileButton_clicked()
             QFileInfo fileInfo(fileName);
             QString baseName = fileInfo.fileName();
 
-            // Добавляем имя файла в QTextEdit
             ui->ignoreTXT->insertPlainText(baseName + "\n");
             }
         } else {
@@ -222,7 +216,6 @@ void SettingsDialog::on_addIgnoredFileButton_clicked()
             QFileInfo fileInfo(fileName);
             QString baseName = fileInfo.fileName();
 
-            // Добавляем имя файла в QTextEdit
             ui->ignoreTXT->insertPlainText(baseName + "\n");
             }
         }
@@ -309,31 +302,42 @@ void SettingsDialog::on_ignoreTXT_textChanged()
 
 void SettingsDialog::on_addIgnoredFolderButton_clicked()
 {
-    // Получаем текст из QLineEdit
     QString customPath = ui->cleaningPath->text();
 
-    // Если пользователь ввел не пустую строку
     if (!customPath.isEmpty()) {
         QString directory = QFileDialog::getExistingDirectory(this, "Select Ignored Directories", customPath, QFileDialog::ShowDirsOnly);
 
-        // Обработка выбранной папки
         if (!directory.isEmpty())
         {
             QDir dir(directory);
-            QString folderName = dir.dirName(); // Получаем имя последней папки
-            ui->ignoreTXT->insertPlainText(folderName + "\n"); // Добавляем только имя папки
+            QString folderName = dir.dirName();
+            ui->ignoreTXT->insertPlainText(folderName + "\n");
         }
     } else {
         QString directory = QFileDialog::getExistingDirectory(this, "Select Ignored Directories", QDir::homePath(), QFileDialog::ShowDirsOnly);
 
-        // Обработка выбранной папки
         if (!directory.isEmpty())
         {
             QDir dir(directory);
-            QString folderName = dir.dirName(); // Получаем имя последней папки
-            ui->ignoreTXT->insertPlainText(folderName + "\n"); // Добавляем только имя папки
+            QString folderName = dir.dirName();
+            ui->ignoreTXT->insertPlainText(folderName + "\n");
         }
     }
+}
+
+
+
+void SettingsDialog::on_serverUpdateTargetPath_textChanged(const QString &arg1)
+{
+    ui->applyButton->setEnabled(true);
+}
+
+void SettingsDialog::on_checkServerTargetPath_clicked()
+{
+    QSettings settings(settingsPath, QSettings::IniFormat);
+    QString currentPath = "\\\\0.0.0.0\\" + settings.value("serverUpdatePath", "").toString();
+    QString message = tr("Your current path is %1\nExample: \\\\0.0.0.0\\d$\\Test\\targetFolder").arg(currentPath);
+    QMessageBox::information(this, tr("Path example"), message);
 }
 
 

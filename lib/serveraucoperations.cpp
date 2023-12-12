@@ -23,7 +23,7 @@
 #include <windows.h>
 
 ServerAUCOperations::ServerAUCOperations(QObject *parent) : QObject(parent) {
-    // Реализация конструктора...
+
 }
 
 void ServerAUCOperations::copyTempToAllSubdirectories(const QString &tempDirPath, const QString &targetDirPath) {
@@ -32,13 +32,13 @@ void ServerAUCOperations::copyTempToAllSubdirectories(const QString &tempDirPath
 
     if (!tempDir.exists()) {
         qDebug() << "Temp directory does not exist: " << tempDirPath;
-
+        emit sendDebugMessage("Temp directory does not exist: " + tempDirPath);
         return;
     }
 
     if (!targetDir.exists()) {
         qDebug() << "Target directory does not exist: " << targetDirPath;
-
+        emit sendDebugMessage("Target directory does not exist: " + targetDirPath);
         return;
     }
 
@@ -49,7 +49,7 @@ void ServerAUCOperations::copyTempToAllSubdirectories(const QString &tempDirPath
         QDir destinationDir(destinationPath);
         if (!destinationDir.exists()) {
             qDebug() << "Destination directory does not exist: " << destinationPath;
-
+            emit sendDebugMessage("Destination directory does not exist: " + destinationPath);
 
             continue;
         }
@@ -63,19 +63,19 @@ void ServerAUCOperations::copyTempToAllSubdirectories(const QString &tempDirPath
             if (QFile::exists(destinationFilePath)) {
                 if (!QFile::remove(destinationFilePath)) {
                     qDebug() << "Failed to remove existing file:" << destinationFilePath;
-
+                    emit sendDebugMessage("Failed to remove existing file: " + destinationFilePath);
                     continue;
                 }
             }
 
             if (!QFile::copy(sourceFilePath, destinationFilePath)) {
                 qDebug() << "Failed to copy file:" << sourceFilePath << "to" << destinationFilePath;
-
+                emit sendDebugMessage("Failed to copy file: " + sourceFilePath + " to " + destinationFilePath);
                 continue;
             }
 
             qDebug() << "Copied file:" << sourceFilePath << "to" << destinationFilePath;
-
+            emit sendDebugMessage("Copied file: " + sourceFilePath + " to " + destinationFilePath);
         }
     }
 }
@@ -86,15 +86,15 @@ void ServerAUCOperations::removeTempDirectory(const QString &tempDirPath) {
     if (tempDir.exists()) {
         if (!tempDir.removeRecursively()) {
             qDebug() << "Failed to remove temp directory: " << tempDirPath;
-
+            emit sendDebugMessage("Failed to remove temp directory: " + tempDirPath);
             return;
         }
 
         qDebug() << "Removed temp directory:" << tempDirPath;
-
+        emit sendDebugMessage("Removed temp directory:" + tempDirPath);
     } else {
         qDebug() << "Temp directory does not exist: " << tempDirPath;
-
+        emit sendDebugMessage("Temp directory does not exist: " + tempDirPath);
     }
 }
 
@@ -104,13 +104,13 @@ void ServerAUCOperations::copyFilesToTemp(const QString &sourceDirPath, const QS
 
     if (!sourceDir.exists()) {
         qDebug() << "Source directory does not exist: " << sourceDirPath;
-
+        emit sendDebugMessage("Source directory does not exist: " + sourceDirPath);
         return;
     }
 
     if (!tempDir.exists() && !tempDir.mkpath(".")) {
         qDebug() << "Failed to create temp directory: " << tempDirPath;
-
+        emit sendDebugMessage("Failed to create temp directory: " + tempDirPath);
         return;
     }
 
@@ -123,12 +123,12 @@ void ServerAUCOperations::copyFilesToTemp(const QString &sourceDirPath, const QS
         // Копируем файлы из источника во временную папку
         if (!QFile::copy(sourceFilePath, destinationFilePath)) {
             qDebug() << "Failed to copy file:" << sourceFilePath << "to" << destinationFilePath;
-
+            emit sendDebugMessage("Failed to copy file:" + sourceFilePath + "to" + destinationFilePath);
             continue;
         }
 
         qDebug() << "Copied file:" << sourceFilePath << "to" << destinationFilePath;
-
+        emit sendDebugMessage("Copied file: " + sourceFilePath + " to " + destinationFilePath);
     }
 }
 
@@ -138,7 +138,7 @@ void ServerAUCOperations::updateVersionFile(const QString &sourceDirPath, const 
 
     if (!sourceDir.exists() || !destinationDir.exists()) {
         qDebug() << "Source or destination directory does not exist.";
-
+        emit sendDebugMessage("Source or destination directory does not exist.");
         return;
     }
 
@@ -151,7 +151,7 @@ void ServerAUCOperations::updateVersionFile(const QString &sourceDirPath, const 
 
     if (!versionFile.open(QIODevice::WriteOnly | QIODevice::Text)) {
         qDebug() << "Failed to open version file for writing.";
-
+        emit sendDebugMessage("Failed to open version file for writing.");
         return;
     }
 
@@ -160,18 +160,19 @@ void ServerAUCOperations::updateVersionFile(const QString &sourceDirPath, const 
 
     versionFile.close();
     qDebug() << "Updated version file in" << destinationDirPath;
-
+    emit sendDebugMessage("Updated version file in " + destinationDirPath);
 }
 
 void ServerAUCOperations::connectToNetworkShare(const QString& server, const QString& share, const QString& username, const QString& password) {
 
-    QString connectCommand = QString("net use Z: \\\\%1\\%2 %3 /user:%4").arg(server, share, password, username);
+    QString connectCommand = QString("net use Z: \\\\%1\\%2 /user:%4 %3").arg(server, share, password, username);
     int result = QProcess::execute(connectCommand);
     if (result == 0) {
         qDebug() << "Connected to " + server + " successfully.";
-
+        emit sendDebugMessage("Connected to " + server + " successfully.");
     } else {
         qDebug() << "Failed to connect to " + server + " via Z:\\ path";
+        emit sendDebugMessage("Failed to connect to " + server + " via Z:\\ path");
     }
 }
 
@@ -183,41 +184,64 @@ void ServerAUCOperations::disconnectFromNetworkShare() {
         emit sendDebugMessage("Disconnected from server successfully");
     } else {
         qDebug() << "Failed to disconnect from server";
+        emit sendDebugMessage("Failed to disconnect from server");
     }
 }
 
 void ServerAUCOperations::updateInBackground(const QString& sourcePath, const QStringList& ipAddresses, const QString& username, const QString& password) {
+    QSettings settings(settingsPath, QSettings::IniFormat);
+
+    emit sendDebugMessage("Attempting to clear the path Z:\\ to connect to the server");
     disconnectFromNetworkShare();
 
     // Цикл для каждого IP-адреса
     for (const QString& ipAddress : ipAddresses) {
         QString tempDirForIP = "Z:\\temp";
 
-        connectToNetworkShare(ipAddress, "d$\\Test\\targetContainer", username, password);
+        connectToNetworkShare(ipAddress, settings.value("serverUpdatePath", "").toString(), username, password);
+        QCoreApplication::processEvents();
+        // Ждем некоторое время перед следующим обновлением
+        QThread::msleep(10);
 
         // Копирование файлов на IP-адрес
         copyFilesToTemp(sourcePath, tempDirForIP);
+        QCoreApplication::processEvents();
+        // Ждем некоторое время перед следующим обновлением
+        QThread::msleep(10);
 
         // Копирование содержимого временной папки в поддиректории
         copyTempToAllSubdirectories(tempDirForIP, "Z:\\");
+        QCoreApplication::processEvents();
+        // Ждем некоторое время перед следующим обновлением
+        QThread::msleep(10);
 
         // Обновление версионного файла
         updateVersionFile(sourcePath, "Z:\\");
+        QCoreApplication::processEvents();
+        // Ждем некоторое время перед следующим обновлением
+        QThread::msleep(10);
 
         // Удаление временной папки
         removeTempDirectory(tempDirForIP);
+        QCoreApplication::processEvents();
+        // Ждем некоторое время перед следующим обновлением
+        QThread::msleep(10);
 
         disconnectFromNetworkShare();
+        QCoreApplication::processEvents();
+        // Ждем некоторое время перед следующим обновлением
+        QThread::msleep(10);
 
         emit sendDebugMessage(ipAddress + " update completed");
 
         QCoreApplication::processEvents();
         // Ждем некоторое время перед следующим обновлением
-        QThread::msleep(100); // Например, 100 миллисекунд
+        QThread::msleep(10);
     }
 }
 
 std::vector<int> ServerAUCOperations::refreshInBackground(const QString& sourcePath, const QString& ipAddress, const QString& username, const QString& password) {
+    QSettings settings(settingsPath, QSettings::IniFormat);
     std::vector<int> reply;
     disconnectFromNetworkShare();
         reply.push_back(checkServerAvailability(ipAddress));
@@ -225,12 +249,18 @@ std::vector<int> ServerAUCOperations::refreshInBackground(const QString& sourceP
         return {6, 6, 6, 6};
         }
 
-        connectToNetworkShare(ipAddress, "d$\\Test\\targetContainer", username, password);
-
+        connectToNetworkShare(ipAddress, settings.value("serverUpdatePath", "").toString(), username, password);
+        QCoreApplication::processEvents();
+        // Ждем некоторое время перед следующим обновлением
+        QThread::msleep(10);
         reply.push_back(countFolders());
-
+        QCoreApplication::processEvents();
+        // Ждем некоторое время перед следующим обновлением
+        QThread::msleep(10);
         reply.push_back(checkVersionMatch(sourcePath));
-
+        QCoreApplication::processEvents();
+        // Ждем некоторое время перед следующим обновлением
+        QThread::msleep(10);
         reply.push_back(checkForProcess(username, password, ipAddress));
 
         /*if (pingOutput.contains("Reply from")) {
@@ -279,6 +309,7 @@ int ServerAUCOperations::checkVersionMatch(const QString& updateSourcePath) {
     }
     if (!versionFile.open(QIODevice::ReadOnly | QIODevice::Text)) {
         qDebug() << "Failed to open version file for reading.";
+        emit sendDebugMessage("Failed to open version file for reading.");
         return 2;
     }
 
@@ -298,7 +329,7 @@ int ServerAUCOperations::checkVersionMatch(const QString& updateSourcePath) {
 }
 
 int ServerAUCOperations::countFolders() {
-    QDir directory("Z:\\"); // Модифицируйте путь в соответствии с вашей структурой
+    QDir directory("Z:\\");
     int folderCount = directory.entryList(QDir::Dirs | QDir::NoDotAndDotDot).count();
     return folderCount;
 }
@@ -314,6 +345,7 @@ int ServerAUCOperations::checkForProcess(const QString& username, const QString&
 
     if (processOutput.contains("ERROR:") || processOutput.contains("Access is denied")) {
         qDebug() << "Incorrect password";
+        emit sendDebugMessage("Incorrect password");
         return 2;
     }
 

@@ -18,10 +18,8 @@ class ServerUpdate;
 class MainWindow : public QMainWindow
 {
     Q_OBJECT
-
 signals:
     void cancelArchiving();
-
 public:
     MainWindow(QWidget *parent = nullptr);
     ~MainWindow();
@@ -30,7 +28,6 @@ public slots:
     void updateDebugConsole(const QString& status) {
         QMetaObject::invokeMethod(ui->debugConsole, "append", Qt::QueuedConnection, Q_ARG(QString, status));
     }
-
 private slots:
 
     void on_clearButton_clicked();

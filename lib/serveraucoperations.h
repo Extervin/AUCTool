@@ -50,6 +50,7 @@ public:
     QString ipStoragePath = appDirPath + "/cfg/iplist.txt";
     QString settingsPath = appDirPath + "/cfg/settings.ini";
     QStringList credentials;
+
 };
 
 

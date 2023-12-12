@@ -170,11 +170,9 @@ void AUCToolOperations::clear(const QString &directoryPath, const QString &ignor
             QString entryPath = directory.filePath(entryName);
             try {
                 if (QFileInfo(entryPath).isDir()) {
-                    // Если это директория, удаляем рекурсивно
                     QDir(entryPath).removeRecursively();
                     emit operationStatus("Deleted directory: " + entryName);
                 } else {
-                    // Если это файл, удаляем его
                     QFile(entryPath).remove();
                     emit operationStatus("Deleted file: " + entryName);
                 }
@@ -184,13 +182,10 @@ void AUCToolOperations::clear(const QString &directoryPath, const QString &ignor
             }
         }
     }
-
-    // Добавляем сообщение о завершении очистки
     emit operationStatus("Directory clearing process completed.");
 }
 
 void AUCToolOperations::addTo7zFromDirectory(const QString &sourceDir, const QString &archiveListFile, const QString &outputDir, QProgressDialog *progressDialog) {
-    // Путь к исполняемому файлу 7-Zip
     QString sevenZipProgram = QCoreApplication::applicationDirPath() + "/7z/7z.exe";
     emit operationStatus("Starting operation...");
 
@@ -237,11 +232,9 @@ void AUCToolOperations::addTo7zFromDirectory(const QString &sourceDir, const QSt
         // Проверяем, существует ли файл в директории, прежде чем его копировать
         if (QFile::exists(sourceFilePath)) {
             if (!QFile::copy(sourceFilePath, tempFilePath)) {
-                // Обработка ошибок при копировании файла
                 emit operationStatus("Error copying file: " + fileName);
             }
         } else {
-            // Обработка случая отсутствия файла в директории
             emit operationStatus("File does not exist in the directory: " + fileName + ", countinue...");
         }
     }
@@ -283,8 +276,7 @@ void AUCToolOperations::addTo7zFromDirectory(const QString &sourceDir, const QSt
 
 void AUCToolOperations::cancelArchivingOperation() {
     QProcess localProcess;
-    localProcess.setProcessChannelMode(QProcess::MergedChannels); // Перенаправляем вывод для корректной отмены
-
+    localProcess.setProcessChannelMode(QProcess::MergedChannels);
     if (localProcess.state() == QProcess::NotRunning) {
         return;
     }

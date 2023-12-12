@@ -24,9 +24,9 @@ MainWindow::MainWindow(QWidget *parent)
     settingsDialog = new SettingsDialog(this);
 
     connect(&tool, &AUCToolOperations::operationStatus, this, &MainWindow::updateDebugConsole);
-    // Подключаем сигнал для открытия окна настроек
+
     connect(ui->actionSettings, &QAction::triggered, this, &MainWindow::on_actionSettings_triggered);
-    // signal for updating txt info
+
     connect(settingsDialog, &SettingsDialog::settingsChanged, this, &MainWindow::updateinfo);
 
     updateinfo();
@@ -56,7 +56,6 @@ void MainWindow::loadTextFile(const QString &filePath, QTextBrowser *textBrowser
     }
     else
     {
-        // Обработка ошибок при открытии файла
         qDebug() << "Unable to open file: " << filePath;
     }
 }
@@ -111,28 +110,26 @@ void MainWindow::on_archiveButton_clicked()
     progressDialog.setAutoReset(true);
 
     connect(&progressDialog, &QProgressDialog::canceled, [&]() {
-        emit cancelArchiving(); // Emit a signal to cancel archiving operation
+        emit cancelArchiving();
     });
 
     QEventLoop loop;
     QFutureWatcher<void> *watcher = new QFutureWatcher<void>(this);
 
     connect(watcher, &QFutureWatcher<void>::finished, [&]() {
-        progressDialog.hide();  // Скрываем диалог после завершения архивации
+        progressDialog.hide();
         ui->clearButton->setEnabled(true);
-        watcher->deleteLater();  // Удаляем watcher после завершения
-        loop.quit();  // Выходим из цикла, чтобы разблокировать приложение
+        watcher->deleteLater();
+        loop.quit();
     });
 
     connect(watcher, &QFutureWatcher<void>::progressValueChanged, [&](int progress) {
         progressDialog.setValue(progress);
     });
 
-    progressDialog.show();  // Показываем диалог
+    progressDialog.show();
 
-    // Запускаем архивацию в отдельном потоке
     QFuture<void> future = QtConcurrent::run([&, sourceDirectory, archiveListFile, outputDirectory, &progressDialog]() {
-        // Connect the signal from MainWindow to the operation
         connect(this, &MainWindow::cancelArchiving, &tool, &AUCToolOperations::cancelArchivingOperation);
 
         tool.addTo7zFromDirectory(sourceDirectory, archiveListFile, outputDirectory, &progressDialog);
@@ -140,7 +137,6 @@ void MainWindow::on_archiveButton_clicked()
 
     watcher->setFuture(future);
 
-    // Блокируем приложение до завершения операции или отмены
     loop.exec();
 }
 
@@ -159,25 +155,19 @@ void MainWindow::on_actionExit_triggered()
 
 void MainWindow::on_actionServer_Update_triggered()
 {
-    // Создаем новый виджет ServerUpdate
     ServerUpdate *serverUpdateWidget = new ServerUpdate(this);
 
-    // Создаем новое главное окно и устанавливаем виджет как его центральный виджет
     QMainWindow *serverUpdateWindow = new QMainWindow(this);
     serverUpdateWindow->setCentralWidget(serverUpdateWidget);
 
-    // Устанавливаем флаг удаления при закрытии для виджета ServerUpdate
     serverUpdateWidget->setAttribute(Qt::WA_DeleteOnClose);
 
-    // Устанавливаем размеры окна и другие необходимые параметры
     serverUpdateWindow->resize(791, 460);
     serverUpdateWindow->setWindowTitle("Server Manager");
 
-    // Подключаем слот, который будет удалять объект виджета после его закрытия
     connect(serverUpdateWidget, &ServerUpdate::destroyed, this, [serverUpdateWindow]() {
-        serverUpdateWindow->deleteLater(); // Удаляем главное окно после уничтожения виджета
+        serverUpdateWindow->deleteLater();
     });
 
-    // Отображаем новое окно
     serverUpdateWindow->show();
 }
