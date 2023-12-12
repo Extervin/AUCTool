@@ -9,8 +9,7 @@ class ServerAUCOperations : public QObject
 {
     Q_OBJECT
 public:
-
-    ServerAUCOperations();
+    explicit ServerAUCOperations(QObject *parent = nullptr);
 
     void updateInBackground(const QString& sourcePath, const QStringList& ipAddresses, const QString& username, const QString& password);
 
@@ -27,7 +26,8 @@ public:
     std::vector<int> refreshInBackground(const QString& sourcePath, const QString &ipAddresses, const QString& username, const QString& password);
 
 signals:
-    void setdebugmessage(const QString& message);
+
+    void sendDebugMessage(const QString& message);
 
 private:
 
@@ -46,16 +46,10 @@ private:
     void disconnectFromNetworkShare();
 
 public:
-
-    QString settingsPath = appDirPath + "/cfg/settings.ini";
-    QStringList credentials;
-
-private:
-
     QString appDirPath = QCoreApplication::applicationDirPath();
     QString ipStoragePath = appDirPath + "/cfg/iplist.txt";
-
-
+    QString settingsPath = appDirPath + "/cfg/settings.ini";
+    QStringList credentials;
 };
 
 

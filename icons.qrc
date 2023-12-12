@@ -1,0 +1,6 @@
+<RCC>
+    <qresource prefix="/themes/icon">
+        <file>icon/upload.png</file>
+        <file>icon/login.png</file>
+    </qresource>
+</RCC>

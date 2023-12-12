@@ -22,9 +22,8 @@
 #include <QtConcurrent>
 #include <windows.h>
 
-ServerAUCOperations::ServerAUCOperations()
-{
-
+ServerAUCOperations::ServerAUCOperations(QObject *parent) : QObject(parent) {
+    // Реализация конструктора...
 }
 
 void ServerAUCOperations::copyTempToAllSubdirectories(const QString &tempDirPath, const QString &targetDirPath) {
@@ -169,10 +168,10 @@ void ServerAUCOperations::connectToNetworkShare(const QString& server, const QSt
     QString connectCommand = QString("net use Z: \\\\%1\\%2 %3 /user:%4").arg(server, share, password, username);
     int result = QProcess::execute(connectCommand);
     if (result == 0) {
-        qDebug() << "Connected to network share successfully.";
+        qDebug() << "Connected to " + server + " successfully.";
 
     } else {
-        qDebug() << "Failed to connect to network share via Z:\\ path";
+        qDebug() << "Failed to connect to " + server + " via Z:\\ path";
     }
 }
 
@@ -180,9 +179,10 @@ void ServerAUCOperations::disconnectFromNetworkShare() {
     QString disconnectCommand = QString("net use Z: /delete /y");
     int result = QProcess::execute(disconnectCommand);
     if (result == 0) {
-        qDebug() << "Disconnected from network share successfully.";
+        qDebug() << "Disconnected from server successfully.";
+        emit sendDebugMessage("Disconnected from server successfully");
     } else {
-        qDebug() << "Failed to disconnect from network share.";
+        qDebug() << "Failed to disconnect from server";
     }
 }
 
@@ -208,6 +208,12 @@ void ServerAUCOperations::updateInBackground(const QString& sourcePath, const QS
         removeTempDirectory(tempDirForIP);
 
         disconnectFromNetworkShare();
+
+        emit sendDebugMessage(ipAddress + " update completed");
+
+        QCoreApplication::processEvents();
+        // Ждем некоторое время перед следующим обновлением
+        QThread::msleep(100); // Например, 100 миллисекунд
     }
 }
 

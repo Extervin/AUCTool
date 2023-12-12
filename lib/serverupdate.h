@@ -23,22 +23,12 @@ class ServerUpdate : public QWidget
 {
     Q_OBJECT
 
-signals:
-    void closed();
-
-    void destroyed(QObject *obj = nullptr);
-
-
 public:
     explicit ServerUpdate(QWidget *parent = nullptr);
     ~ServerUpdate();
 
 public slots:
-    void saveAndClose();
-
-    void debugmessage(const QString& message) {
-        QMetaObject::invokeMethod(ui->debugBrowser, "append", Qt::QueuedConnection, Q_ARG(QString, message));
-    }
+    void receiveDebugMessage(const QString& message);
 
 protected:
     void keyPressEvent(QKeyEvent *event) override;
@@ -48,13 +38,15 @@ private slots:
 
     void on_addButton_clicked();
 
-    void closeEvent(QCloseEvent *event);
-
     void on_serverUpdateButton_clicked();
 
     void on_refreshButton_clicked();
 
     void on_toolButton_clicked();
+
+    void on_loginButton_clicked();
+
+    void on_chooseAll_stateChanged(int arg1);
 
 private:
     void saveToFile(const QString &filename);

@@ -42,3 +42,6 @@ LIBS += -lz
 
 INCLUDEPATH += "C:\0-project\project-3\quazip\include"
 LIBS += -L"C:\0-project\project-3\quazip\lib" -lquazip
+
+RESOURCES += \
+    icons.qrc
