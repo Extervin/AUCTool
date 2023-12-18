@@ -29,6 +29,8 @@ public:
 public slots:
     void receiveDebugMessage(const QString& message);
 
+    void setTableValue(int row, int col, QString value, const QColor &color);
+
 protected:
     void keyPressEvent(QKeyEvent *event) override;
 

@@ -4,6 +4,7 @@
 #include <QObject>
 #include <QCoreApplication>
 #include <QTableWidget>
+#include <QThread>
 
 class ServerAUCOperations : public QObject
 {
@@ -11,7 +12,7 @@ class ServerAUCOperations : public QObject
 public:
     explicit ServerAUCOperations(QObject *parent = nullptr);
 
-    void updateInBackground(const QString& sourcePath, const QStringList& ipAddresses, const QString& username, const QString& password);
+    void updateInBackground(const QString& sourcePath, const QStringList& ipAddresses, const QString& username, const QString& password, std::vector<int> rowID);
 
     int countFolders();
 
@@ -25,9 +26,26 @@ public:
 
     std::vector<int> refreshInBackground(const QString& sourcePath, const QString &ipAddresses, const QString& username, const QString& password);
 
+    void closeAndUpdateInBackground(const QString& sourcePath, const QStringList& ipAddresses, const QString& username, const QString& password, std::vector<int> rowID);
+
+public slots:
+
+    void performUpdateInBackground(const QString& sourcePath, const QStringList& ipAddresses, const QString& username, const QString& password, std::vector<int> rowID) {
+
+        moveToThread(QThread::currentThread());
+
+        updateInBackground(sourcePath, ipAddresses, username, password, rowID);
+
+        emit finished();
+    }
+
 signals:
 
     void sendDebugMessage(const QString& message);
+
+    void finished();
+
+    void sendTableValue(int row, int col, QString value, const QColor &color);
 
 private:
 
@@ -37,7 +55,7 @@ private:
 
     void removeTempDirectory(const QString &tempDirPath);
 
-    void updateVersionFile(const QString &sourceDirPath, const QString &targetDirPath);
+    bool updateVersionFile(const QString &sourceDirPath, const QString &targetDirPath);
 
     void startUpdate();
 

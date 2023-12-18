@@ -44,13 +44,18 @@ void ServerAUCOperations::copyTempToAllSubdirectories(const QString &tempDirPath
 
     QStringList subDirectories = targetDir.entryList(QDir::Dirs | QDir::NoDotAndDotDot);
     foreach (const QString &subDirectory, subDirectories) {
+        if (subDirectory == "temp") {
+            qDebug() << "Skipping 'temp' directory: " << targetDir.absoluteFilePath(subDirectory);
+            emit sendDebugMessage("Skipping 'temp' directory: " + targetDir.absoluteFilePath(subDirectory));
+            continue;
+        }
+
         QString destinationPath = targetDir.absoluteFilePath(subDirectory);
 
         QDir destinationDir(destinationPath);
         if (!destinationDir.exists()) {
             qDebug() << "Destination directory does not exist: " << destinationPath;
             emit sendDebugMessage("Destination directory does not exist: " + destinationPath);
-
             continue;
         }
 
@@ -79,6 +84,9 @@ void ServerAUCOperations::copyTempToAllSubdirectories(const QString &tempDirPath
         }
     }
 }
+
+
+
 
 void ServerAUCOperations::removeTempDirectory(const QString &tempDirPath) {
     QDir tempDir(tempDirPath);
@@ -132,35 +140,65 @@ void ServerAUCOperations::copyFilesToTemp(const QString &sourceDirPath, const QS
     }
 }
 
-void ServerAUCOperations::updateVersionFile(const QString &sourceDirPath, const QString &destinationDirPath) {
+
+
+bool ServerAUCOperations::updateVersionFile(const QString &sourceDirPath, const QString &destinationDirPath) {
+    QString filePath = destinationDirPath + "/version.txt";
+    QFile file(filePath);
+
+    if (!file.open(QIODevice::ReadWrite | QIODevice::Text)) {
+        qDebug() << "Failed to open file for writing.";
+        emit sendDebugMessage("Failed to open file for writing.");
+        return false;
+    }
+
+    QTextStream in(&file);
+
+    // Считываем содержимое файла в QMap для последующего сравнения
+    QMap<QString, QString> existingFiles;
+    while (!in.atEnd()) {
+        QString line = in.readLine();
+        QStringList parts = line.split(" - Last modified: ");
+        if (parts.length() == 2) {
+            existingFiles[parts[0]] = parts[1];
+        }
+    }
+
     QDir sourceDir(sourceDirPath);
-    QDir destinationDir(destinationDirPath);
-
-    if (!sourceDir.exists() || !destinationDir.exists()) {
-        qDebug() << "Source or destination directory does not exist.";
-        emit sendDebugMessage("Source or destination directory does not exist.");
-        return;
+    if (!sourceDir.exists()) {
+        qDebug() << "Source directory does not exist.";
+        emit sendDebugMessage("Source directory does not exist.");
+        file.close();
+        return false;
     }
 
-    QString drugFilePath = sourceDirPath + "/drug.exe";
-    QFileInfo drugFileInfo(drugFilePath);
-    QDateTime lastModified = drugFileInfo.lastModified();
+    QStringList fileNames = sourceDir.entryList(QDir::Files);
+    QTextStream out(&file);
+    foreach (const QString &fileName, fileNames) {
+        QString filePath = sourceDir.filePath(fileName);
+        QFileInfo fileInfo(filePath);
+        QDateTime lastModified = fileInfo.lastModified();
 
-    QString versionFilePath = destinationDirPath + "/version.txt";
-    QFile versionFile(versionFilePath);
-
-    if (!versionFile.open(QIODevice::WriteOnly | QIODevice::Text)) {
-        qDebug() << "Failed to open version file for writing.";
-        emit sendDebugMessage("Failed to open version file for writing.");
-        return;
+        // Проверяем, есть ли файл уже в списке. Если есть, обновляем информацию
+        if (existingFiles.contains(fileName)) {
+            if (existingFiles[fileName] != lastModified.toString()) {
+                out << fileName << " - Last modified: " << lastModified.toString() << "\n";
+                qDebug() << "Updated file information for" << fileName;
+                emit sendDebugMessage("Updated file information for " + fileName);
+            }
+        } else {
+            // Если файла не было в списке, добавляем его
+            out << fileName << " - Last modified: " << lastModified.toString() << "\n";
+            qDebug() << "Added file information for" << fileName;
+            emit sendDebugMessage("Added file information for " + fileName);
+        }
     }
 
-    QTextStream out(&versionFile);
-    out << "Last modified: " << lastModified.toString() << "\n";
+    file.close();
+    qDebug() << "Finished updating file information.";
+    emit sendDebugMessage("Finished updating file information.");
 
-    versionFile.close();
-    qDebug() << "Updated version file in" << destinationDirPath;
-    emit sendDebugMessage("Updated version file in " + destinationDirPath);
+    return true;
 }
 
 void ServerAUCOperations::connectToNetworkShare(const QString& server, const QString& share, const QString& username, const QString& password) {
@@ -188,55 +226,105 @@ void ServerAUCOperations::disconnectFromNetworkShare() {
     }
 }
 
-void ServerAUCOperations::updateInBackground(const QString& sourcePath, const QStringList& ipAddresses, const QString& username, const QString& password) {
+void ServerAUCOperations::updateInBackground(const QString& sourcePath, const QStringList& ipAddresses, const QString& username, const QString& password, std::vector<int> rowID) {
     QSettings settings(settingsPath, QSettings::IniFormat);
 
     emit sendDebugMessage("Attempting to clear the path Z:\\ to connect to the server");
     disconnectFromNetworkShare();
-
+    int i = 0;
     // Цикл для каждого IP-адреса
     for (const QString& ipAddress : ipAddresses) {
+        int row = rowID[i];
+
         QString tempDirForIP = "Z:\\temp";
 
         connectToNetworkShare(ipAddress, settings.value("serverUpdatePath", "").toString(), username, password);
-        QCoreApplication::processEvents();
-        // Ждем некоторое время перед следующим обновлением
-        QThread::msleep(10);
 
         // Копирование файлов на IP-адрес
         copyFilesToTemp(sourcePath, tempDirForIP);
-        QCoreApplication::processEvents();
-        // Ждем некоторое время перед следующим обновлением
-        QThread::msleep(10);
 
         // Копирование содержимого временной папки в поддиректории
         copyTempToAllSubdirectories(tempDirForIP, "Z:\\");
-        QCoreApplication::processEvents();
-        // Ждем некоторое время перед следующим обновлением
-        QThread::msleep(10);
 
         // Обновление версионного файла
-        updateVersionFile(sourcePath, "Z:\\");
-        QCoreApplication::processEvents();
-        // Ждем некоторое время перед следующим обновлением
-        QThread::msleep(10);
+        if (updateVersionFile(sourcePath, "Z:\\")) {
+            qDebug() << "File information updated or created successfully.";
+            emit sendDebugMessage("File information updated or created successfully.");
+            int check = checkVersionMatch(sourcePath);
+            if (check == 1) {
+                emit sendTableValue(row, 6, "match", Qt::darkGreen);
+            } else if (check == 0) {
+                emit sendTableValue(row, 6, "unmatch", Qt::red);
+            } else if (check == 2) {
+               emit sendTableValue(row, 6, "error", Qt::red);
+            }
+        } else {
+            qDebug() << "Failed to update or create file information.";
+            emit sendDebugMessage("Failed to update or create file information.");
+            emit sendTableValue(row, 6, "error", Qt::red);
+        }
 
         // Удаление временной папки
         removeTempDirectory(tempDirForIP);
-        QCoreApplication::processEvents();
-        // Ждем некоторое время перед следующим обновлением
-        QThread::msleep(10);
 
         disconnectFromNetworkShare();
-        QCoreApplication::processEvents();
-        // Ждем некоторое время перед следующим обновлением
-        QThread::msleep(10);
 
         emit sendDebugMessage(ipAddress + " update completed");
+        if (i < rowID.size()) {
+            i++;
+        }
+    }
+}
 
-        QCoreApplication::processEvents();
-        // Ждем некоторое время перед следующим обновлением
-        QThread::msleep(10);
+void ServerAUCOperations::closeAndUpdateInBackground(const QString& sourcePath, const QStringList& ipAddresses, const QString& username, const QString& password, std::vector<int> rowID) {
+    QSettings settings(settingsPath, QSettings::IniFormat);
+
+    emit sendDebugMessage("Attempting to clear the path Z:\\ to connect to the server");
+    disconnectFromNetworkShare();
+    int i = 0;
+    // Цикл для каждого IP-адреса
+    for (const QString& ipAddress : ipAddresses) {
+        int row = rowID[i];
+
+        QString tempDirForIP = "Z:\\temp";
+
+        connectToNetworkShare(ipAddress, settings.value("serverUpdatePath", "").toString(), username, password);
+
+        // Копирование файлов на IP-адрес
+        copyFilesToTemp(sourcePath, tempDirForIP);
+
+        closeDrugProcesses(ipAddress, username, password);
+
+        // Копирование содержимого временной папки в поддиректории
+        copyTempToAllSubdirectories(tempDirForIP, "Z:\\");
+
+        // Обновление версионного файла
+        if (updateVersionFile(sourcePath, "Z:\\")) {
+            qDebug() << "File information updated or created successfully.";
+            emit sendDebugMessage("File information updated or created successfully.");
+            int check = checkVersionMatch(sourcePath);
+            if (check == 1) {
+               emit sendTableValue(row, 6, "match", Qt::darkGreen);
+            } else if (check == 0) {
+               emit sendTableValue(row, 6, "unmatch", Qt::red);
+            } else if (check == 2) {
+               emit sendTableValue(row, 6, "error", Qt::red);
+            }
+        } else {
+            qDebug() << "Failed to update or create file information.";
+            emit sendDebugMessage("Failed to update or create file information.");
+            emit sendTableValue(row, 6, "error", Qt::red);
+        }
+
+        // Удаление временной папки
+        removeTempDirectory(tempDirForIP);
+
+        disconnectFromNetworkShare();
+
+        emit sendDebugMessage(ipAddress + " update completed");
+        if (i < rowID.size()) {
+            i++;
+        }
     }
 }
 
@@ -246,39 +334,17 @@ std::vector<int> ServerAUCOperations::refreshInBackground(const QString& sourceP
     disconnectFromNetworkShare();
         reply.push_back(checkServerAvailability(ipAddress));
         if (reply[0] == 0 || reply[0] == 2) {
-        return {6, 6, 6, 6};
+        return {2, 0, 2, 2};
         }
 
         connectToNetworkShare(ipAddress, settings.value("serverUpdatePath", "").toString(), username, password);
-        QCoreApplication::processEvents();
-        // Ждем некоторое время перед следующим обновлением
-        QThread::msleep(10);
+
         reply.push_back(countFolders());
-        QCoreApplication::processEvents();
-        // Ждем некоторое время перед следующим обновлением
-        QThread::msleep(10);
+
         reply.push_back(checkVersionMatch(sourcePath));
-        QCoreApplication::processEvents();
-        // Ждем некоторое время перед следующим обновлением
-        QThread::msleep(10);
+
         reply.push_back(checkForProcess(username, password, ipAddress));
 
-        /*if (pingOutput.contains("Reply from")) {
-            statusItem->setText("✔"); // зеленая галочка
-            statusItem->setData(Qt::ForegroundRole, QBrush(Qt::darkGreen));
-        } else {
-            statusItem->setText("✖"); // красный крестик
-            statusItem->setData(Qt::ForegroundRole, QBrush(Qt::red));
-        }*/
-        /*
-            if (versionInfo.contains(updateLastModified.toString())) {
-                versionItem->setText("match");
-                versionItem->setForeground(Qt::darkGreen);
-            } else {
-                versionItem->setText("unmatch");
-                versionItem->setForeground(Qt::red);
-            }
-        */
         disconnectFromNetworkShare();
         //1 yes 0 no 2 error
         return reply;
@@ -300,11 +366,11 @@ int ServerAUCOperations::checkServerAvailability(QString ipAddress) {
 }
 
 int ServerAUCOperations::checkVersionMatch(const QString& updateSourcePath) {
-
     QString versionFilePath = "Z:\\version.txt";
     QFile versionFile(versionFilePath);
 
     if (!versionFile.exists()) {
+        qDebug() << "Version file does not exist.";
         return 0;
     }
     if (!versionFile.open(QIODevice::ReadOnly | QIODevice::Text)) {
@@ -314,19 +380,51 @@ int ServerAUCOperations::checkVersionMatch(const QString& updateSourcePath) {
     }
 
     QTextStream in(&versionFile);
-    QString versionInfo = in.readAll();
+    QMap<QString, QString> versionInfo; // Теперь используем QMap<QString, QString>
+
+    while (!in.atEnd()) {
+        QString line = in.readLine();
+        QStringList parts = line.split(" - Last modified: ");
+        if (parts.length() == 2) {
+            QString fileName = parts[0];
+            QString lastModified = parts[1]; // Сохраняем дату как строку
+            versionInfo[fileName] = lastModified;
+        }
+    }
+
     versionFile.close();
 
-    QString updateDrugFilePath = updateSourcePath + "/drug.exe";
-    QFileInfo updateDrugFileInfo(updateDrugFilePath);
-    QDateTime updateLastModified = updateDrugFileInfo.lastModified();
-
-    if (versionInfo.contains(updateLastModified.toString())) {
-        return 1;
-    } else {
-        return 0;
+    QDir sourceDir(updateSourcePath);
+    if (!sourceDir.exists()) {
+        qDebug() << "Source directory does not exist.";
+        emit sendDebugMessage("Source directory does not exist.");
+        return 2;
     }
+
+    QStringList fileNames = sourceDir.entryList(QDir::Files);
+    foreach (const QString &fileName, fileNames) {
+        QString filePath = sourceDir.filePath(fileName);
+        QFileInfo fileInfo(filePath);
+        QString lastModified = fileInfo.lastModified().toString(); // Сохраняем дату как строку
+
+        if (versionInfo.contains(fileName)) {
+            qDebug() << "Comparing file:" << fileName;
+            QString versionDateString = versionInfo[fileName];
+            qDebug() << versionDateString << " and " << lastModified;
+
+            if (versionDateString != lastModified) {
+                qDebug() << "Mismatch for file:" << fileName;
+                return 0;
+            }
+        } else {
+            qDebug() << "File not found in version.txt:" << fileName;
+            return 0; // Если хотя бы один файл отсутствует в version.txt, считаем несовпадением
+        }
+    }
+
+    return 1;
 }
+
 
 int ServerAUCOperations::countFolders() {
     QDir directory("Z:\\");
@@ -342,14 +440,13 @@ int ServerAUCOperations::checkForProcess(const QString& username, const QString&
     process.waitForFinished(-1);
 
     QString processOutput = QString::fromLocal8Bit(process.readAllStandardOutput());
-
     if (processOutput.contains("ERROR:") || processOutput.contains("Access is denied")) {
         qDebug() << "Incorrect password";
         emit sendDebugMessage("Incorrect password");
         return 2;
     }
 
-    if (processOutput.toLower().contains("drug.exe") || processOutput.toLower().contains("drugsys.exe")) {
+    if (processOutput.toLower().contains("drug.exe") || processOutput.toLower().contains("drugsys.exe")) { // i hate useless warnings about unneeded allocation
         return 1;
     } else {
         return 0;
