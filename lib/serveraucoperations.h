@@ -24,7 +24,7 @@ public:
 
     void closeDrugProcesses(const QString& ipAddress, const QString& username, const QString& password);
 
-    std::vector<int> refreshInBackground(const QString& sourcePath, const QString &ipAddresses, const QString& username, const QString& password);
+    void refreshInBackground(const QString& sourcePath, const QStringList& ipAddresses, const QString& username, const QString& password, std::vector<int> rowID);
 
     void closeAndUpdateInBackground(const QString& sourcePath, const QStringList& ipAddresses, const QString& username, const QString& password, std::vector<int> rowID);
 

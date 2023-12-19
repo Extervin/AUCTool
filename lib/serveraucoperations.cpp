@@ -328,26 +328,74 @@ void ServerAUCOperations::closeAndUpdateInBackground(const QString& sourcePath, 
     }
 }
 
-std::vector<int> ServerAUCOperations::refreshInBackground(const QString& sourcePath, const QString& ipAddress, const QString& username, const QString& password) {
+void ServerAUCOperations::refreshInBackground(const QString& sourcePath, const QStringList& ipAddresses, const QString& username, const QString& password, std::vector<int> rowID) {
     QSettings settings(settingsPath, QSettings::IniFormat);
-    std::vector<int> reply;
-    disconnectFromNetworkShare();
-        reply.push_back(checkServerAvailability(ipAddress));
-        if (reply[0] == 0 || reply[0] == 2) {
-        return {2, 0, 2, 2};
+
+    int i = 0;
+
+    qDebug() << "i = " << i;
+
+    for (const QString& ipAddress : ipAddresses) {
+        int row = rowID[i];
+        qDebug() << "row = " << row;
+        disconnectFromNetworkShare();
+
+        int serverAvailability = checkServerAvailability(ipAddress);
+        qDebug() << "serverAvailability = " << serverAvailability;
+        if (serverAvailability == 1) {
+            emit sendTableValue(row, 4, "✔", Qt::darkGreen);
+            qDebug() << "ping working";
+        }
+
+        if (serverAvailability == 0 || serverAvailability == 2) {
+            // добавить приколов для отображения
+            emit sendTableValue(row, 3, "err", Qt::red);
+            emit sendTableValue(row, 4, "✖", Qt::red);
+            emit sendTableValue(row, 5, "err", Qt::red);
+            emit sendTableValue(row, 6, "error", Qt::red);
+            qDebug() << "ping not working";
+            continue; // Пропускаем остальные проверки, если сервер недоступен или есть ошибка
         }
 
         connectToNetworkShare(ipAddress, settings.value("serverUpdatePath", "").toString(), username, password);
 
-        reply.push_back(countFolders());
+        int folderCount = countFolders();
+        qDebug() << "folderCount = " << folderCount;
+        if (folderCount == 0) {
+            emit sendTableValue(row, 3, "error", Qt::red);
+        } else {
+            emit sendTableValue(row, 3, QString::number(folderCount), Qt::black);
+        }
 
-        reply.push_back(checkVersionMatch(sourcePath));
+        int versionMatch = checkVersionMatch(sourcePath);
+        qDebug() << "versionMatch = " << versionMatch;
+        if (versionMatch == 1) {
+            emit sendTableValue(row, 6, "match", Qt::darkGreen);
+        } else if (versionMatch == 0) {
+            emit sendTableValue(row, 6, "unmatch", Qt::red);
+        } else if (versionMatch == 2) {
+            emit sendTableValue(row, 6, "error", Qt::red);
+        }
 
-        reply.push_back(checkForProcess(username, password, ipAddress));
+        int processCheck = checkForProcess(username, password, ipAddress);
+        qDebug() << "processCheck = " << processCheck;
+        if (processCheck == 0) {
+            emit sendTableValue(row, 5, "closed", Qt::darkGreen);
+        } else if (processCheck == 1) {
+            emit sendTableValue(row, 5, "opened", Qt::red);
+        } else if (processCheck == 2) {
+            emit sendTableValue(row, 5, "error", Qt::red);
+        }
 
         disconnectFromNetworkShare();
+
+        if (i < rowID.size()) {
+            i++;
+            qDebug() << i;
+        }
+    }
         //1 yes 0 no 2 error
-        return reply;
+
 }
 
 int ServerAUCOperations::checkServerAvailability(QString ipAddress) {

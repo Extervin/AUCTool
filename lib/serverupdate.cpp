@@ -50,6 +50,7 @@ ServerUpdate::ServerUpdate(QWidget *parent) :
     connect(operation, &ServerAUCOperations::sendDebugMessage, this, &ServerUpdate::receiveDebugMessage);
 
     connect(operation, &ServerAUCOperations::sendTableValue, this, &ServerUpdate::setTableValue);
+
 }
 
 ServerUpdate::~ServerUpdate()
@@ -269,83 +270,34 @@ void ServerUpdate::refresh() {
     }
 
     QSettings settings(settingsPath, QSettings::IniFormat);
-
     QString sourceUpdatePath = settings.value("updateSourcePath").toString();
 
-    // Получаем список IP-адресов из таблицы
+    QStringList ipAddresses;
+    std::vector<int> rowID;
+
     for (int row = 0; row < ui->tableWidget->rowCount(); ++row) {
         QTableWidgetItem *checkBoxItem = ui->tableWidget->item(row, 0);
         if (checkBoxItem && checkBoxItem->checkState() == Qt::Checked) {
             QTableWidgetItem *ipItem = ui->tableWidget->item(row, 2);
             if (ipItem) {
                 QString ipAddress = ipItem->text();
-
-                QtConcurrent::run([=]() {
-                    std::vector<int> reply = operation->refreshInBackground(sourceUpdatePath, ipAddress, username, password);
-
-                    // Обновляем UI с помощью invokeMethod для обеспечения безопасности потока GUI
-                    QMetaObject::invokeMethod(this, [=]() {
-                        // Обновляем таблицу с учетом данных из reply
-                        // Пинг
-                        if (reply[0] == 1) {
-                            QTableWidgetItem *item = new QTableWidgetItem("✔");
-                            item->setForeground(Qt::darkGreen);
-                            ui->tableWidget->setItem(row, 4, item);
-                        } else if (reply[0] == 0) {
-                            QTableWidgetItem *item = new QTableWidgetItem("✖");
-                            item->setForeground(Qt::red);
-                            ui->tableWidget->setItem(row, 4, item);
-                        } else if (reply[0] == 2) {
-                            QTableWidgetItem *item = new QTableWidgetItem("err");
-                            item->setForeground(Qt::red);
-                            ui->tableWidget->setItem(row, 4, item);
-                        }
-
-                        // drug.exe
-                        if (reply[3] == 0) {
-                            QTableWidgetItem *item = new QTableWidgetItem("✔");
-                            item->setForeground(Qt::darkGreen);
-                            ui->tableWidget->setItem(row, 5, item);
-                        } else if (reply[3] == 1) {
-                            QTableWidgetItem *item = new QTableWidgetItem("✖");
-                            item->setForeground(Qt::red);
-                            ui->tableWidget->setItem(row, 5, item);
-                        } else if (reply[3] == 2) {
-                            QTableWidgetItem *item = new QTableWidgetItem("err");
-                            item->setForeground(Qt::red);
-                            ui->tableWidget->setItem(row, 5, item);
-                        }
-
-                        //folders
-                        if (reply[1] == 0) {
-                            QTableWidgetItem *item = new QTableWidgetItem("err");
-                            item->setForeground(Qt::red);
-                            ui->tableWidget->setItem(row, 3, item);
-                        } else {
-                            int value = reply[1];
-                            QTableWidgetItem *item = new QTableWidgetItem(QString::number(value));
-                            ui->tableWidget->setItem(row, 3, item);
-                        }
-
-                        // version
-                        if (reply[2] == 1) {
-                            QTableWidgetItem *item = new QTableWidgetItem("match");
-                            item->setForeground(Qt::darkGreen);
-                            ui->tableWidget->setItem(row, 6, item);
-                        } else if (reply[2] == 0) {
-                            QTableWidgetItem *item = new QTableWidgetItem("unmatch");
-                            item->setForeground(Qt::red);
-                            ui->tableWidget->setItem(row, 6, item);
-                        } else if (reply[2] == 2) {
-                            QTableWidgetItem *item = new QTableWidgetItem("error");
-                            item->setForeground(Qt::red);
-                            ui->tableWidget->setItem(row, 6, item);
-                        }
-                    });
-                });
+                ipAddresses << ipAddress;
+                rowID.push_back(row);
             }
         }
     }
+
+    QThread* updateThread = new QThread(this);
+    operation->moveToThread(updateThread);
+
+    // Соединяем сигналы со слотами для выполнения refreshInBackground в отдельном потоке
+    connect(updateThread, &QThread::started, [=]() {
+        operation->refreshInBackground(sourceUpdatePath, ipAddresses, username, password, rowID);
+        updateThread->quit();
+    });
+
+
+    updateThread->start(); // Запускаем поток
 }
 
 void ServerUpdate::on_toolButton_clicked() {
