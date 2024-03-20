@@ -41,7 +41,6 @@ void SwitchButton::setChecked(bool checked) {
 
 void SwitchButton::resizeEvent(QResizeEvent *event) {
     Q_UNUSED(event);
-    // Пересчитываем размеры виджета при изменении размера
     int newHeight = 44; // Новая высота виджета
     setFixedHeight(newHeight);
 }
