@@ -1,6 +1,7 @@
 <RCC>
-    <qresource prefix="/themes/icon">
-        <file>icon/upload.png</file>
-        <file>icon/login.png</file>
+    <qresource prefix="/buttons">
+        <file>icon/filter.svg</file>
+        <file>icon/search.svg</file>
+        <file>icon/x-666666-color.svg</file>
     </qresource>
 </RCC>

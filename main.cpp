@@ -1,4 +1,4 @@
-#include "mainwindow.h"
+#include "serverinterface.h"
 
 #include <QApplication>
 #include <QLocale>
@@ -7,7 +7,6 @@
 int main(int argc, char *argv[])
 {
     QApplication a(argc, argv);
-
 
     QTranslator translator;
     const QStringList uiLanguages = QLocale::system().uiLanguages();
@@ -18,7 +17,7 @@ int main(int argc, char *argv[])
             break;
         }
     }
-    MainWindow w;
+    ServerInterface w;
     w.show();
     return a.exec();
 }
