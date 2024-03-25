@@ -3,6 +3,9 @@
 
 #include <QMainWindow>
 #include "switchbutton.h" // Добавьте это
+#include <QWidget>
+#include <QString>
+#include <QMap>
 
 QT_BEGIN_NAMESPACE
 namespace Ui { class ServerInterface; }
@@ -13,7 +16,7 @@ class ServerInterface : public QMainWindow
     Q_OBJECT
 
 public:
-    ServerInterface(QWidget *parent = nullptr);
+    explicit ServerInterface(QWidget *parent = nullptr);
     ~ServerInterface();
 
 private slots:
@@ -21,7 +24,9 @@ private slots:
     void spawnTable();
     void spawnMenu();
 
-    void cancelFilter();
+    void cancelFilter(QWidget *filterWidget);
+    void applyFilter(const QString &columnName, const QString &value, const QString &displayText, const bool chosenOperator);
+    void updateFilter();
 
     void applyCityFilter(const QString &city);
     void applyTagFilter(const QString &tag);
@@ -30,9 +35,14 @@ private slots:
 
 private:
     Ui::ServerInterface *ui;
+
     int cityFilterIndex = 0;
     int statusFilterIndex = 0;
     int tagFilterIndex = 0;
+    int filterIndex = 0;
+
+    QMap<QWidget*, QString> appliedFilters;
+    QString currentQuery;
 };
 
 #endif // SERVERINTERFACE_H

@@ -17,6 +17,13 @@ ServerInterface::ServerInterface(QWidget *parent) :
     spawnTable();
     spawnMenu();
 
+    // Получаем и сохраняем исходный запрос
+    QSqlQueryModel *model = qobject_cast<QSqlQueryModel*>(ui->tableView->model());
+    if (model) {
+        currentQuery = model->query().executedQuery();
+    } else {
+        qDebug() << "Модель данных не найдена!";
+    }
 }
 
 void ServerInterface::onSwitchToggled(bool checked) {
@@ -164,41 +171,6 @@ void ServerInterface::spawnMenu() {
     });
 }
 
-void ServerInterface::cancelFilter() {
-    QObject *senderObj = sender();
-    if (!senderObj)
-        return;
-
-    // Получаем родительский виджет кнопки, который содержит фильтр
-    QWidget *filterWidget = qobject_cast<QWidget*>(senderObj->parent());
-    if (!filterWidget)
-        return;
-
-    // Удаляем фильтр и его дочерние виджеты из контейнера
-    QWidget *appliedFiltersContainer = ui->appliedFilters;
-    appliedFiltersContainer->layout()->removeWidget(filterWidget);
-    delete filterWidget;
-
-    // Очищаем фильтр в модели данных
-    QSqlQueryModel *model = qobject_cast<QSqlQueryModel*>(ui->tableView->model());
-    if (!model) {
-        qDebug() << "Модель данных не найдена!";
-        return;
-    }
-
-    // Получаем текущий SQL-запрос
-    QString currentQuery = model->query().executedQuery();
-
-    // Очищаем фильтр из SQL-запроса
-    QString newQuery = currentQuery.section(" WHERE ", 0, 0); // Удаляем часть после "WHERE"
-
-    // Устанавливаем новый SQL-запрос в модель
-    model->setQuery(newQuery);
-
-    // Обновляем вид
-    ui->tableView->resizeColumnsToContents();
-}
-
 void ServerInterface::spawnTable() {
     QSqlDatabase db = QSqlDatabase::addDatabase("QMYSQL");
     db.setHostName("127.0.0.1");
@@ -235,25 +207,49 @@ ServerInterface::~ServerInterface()
     delete ui;
 }
 
-void ServerInterface::applyCityFilter(const QString &city) {
+void ServerInterface::cancelFilter(QWidget *filterWidget) {
+    if (filterWidget) {
+        // Удаляем виджет из контейнера
+        filterWidget->deleteLater();
+        // Удаляем запись из структуры appliedFilters по ключу (указателю на виджет)
+        appliedFilters.remove(filterWidget);
+        // Обновляем фильтр для отображения изменений
+        updateFilter();
+    }
+}
+
+void ServerInterface::updateFilter() {
     QSqlQueryModel *model = qobject_cast<QSqlQueryModel*>(ui->tableView->model());
     if (!model) {
         qDebug() << "Модель данных не найдена!";
         return;
     }
 
-    // Получаем текущий SQL-запрос
-    QString currentQuery = model->query().executedQuery();
+    // Создаем строку запроса с начальным значением, не содержащим WHERE
+    QString newQuery = currentQuery;
+    // Проверяем, есть ли какие-либо фильтры
+    if (!appliedFilters.isEmpty()) {
+        newQuery += " WHERE";
+        QStringList filters; // Создаем список для хранения обработанных фильтров
+        for (const auto& query : appliedFilters) {
+            filters.append(query); // Добавляем фильтр в список
+        }
+        // Объединяем фильтры с помощью логического оператора AND
+        newQuery += filters.join(" AND ");
+    }
 
-    // Добавляем фильтр по городу в SQL-запрос
-    QString newQuery = currentQuery + (currentQuery.contains("WHERE") ? " AND" : " WHERE") + " IT = '" + city + "'";
+    qDebug() << "Новый запрос:" << newQuery;
 
     // Устанавливаем новый SQL-запрос в модель
     model->setQuery(newQuery);
 
     // Обновляем вид
     ui->tableView->resizeColumnsToContents();
+}
 
+
+
+void ServerInterface::applyFilter(const QString &columnName, const QString &value, const QString &displayText, const bool chosenOperator) {
     // Добавляем примененный фильтр в контейнер с примененными фильтрами
     QWidget *appliedFiltersContainer = ui->appliedFilters;
     if (!appliedFiltersContainer)
@@ -261,14 +257,14 @@ void ServerInterface::applyCityFilter(const QString &city) {
 
     // Создаем новый виджет для фильтра
     QWidget *filterWidget = new QWidget(appliedFiltersContainer);
-    QString filterObjectName = "filter" + QString::number(cityFilterIndex);
+    QString filterObjectName = "filter" + QString::number(++filterIndex);
     filterWidget->setObjectName(filterObjectName);
 
     QHBoxLayout *filterLayout = new QHBoxLayout(filterWidget);
     filterLayout->setSpacing(5);
     filterLayout->setContentsMargins(9, 6, 9, 6);
 
-    QLabel *filterLabel = new QLabel(city, filterWidget);
+    QLabel *filterLabel = new QLabel(displayText, filterWidget);
     filterLayout->addWidget(filterLabel);
 
     QPushButton *cancelButton = new QPushButton(filterWidget);
@@ -278,7 +274,9 @@ void ServerInterface::applyCityFilter(const QString &city) {
     cancelButton->setIconSize(QSize(10, 10));
     cancelButton->setFixedSize(20, 20);
     cancelButton->setCursor(Qt::PointingHandCursor);
-    connect(cancelButton, &QPushButton::clicked, this, &ServerInterface::cancelFilter);
+    connect(cancelButton, &QPushButton::clicked, this, [=]() {
+        cancelFilter(filterWidget);
+    });
     filterLayout->addWidget(cancelButton);
 
     QHBoxLayout *appliedFiltersLayout = qobject_cast<QHBoxLayout*>(appliedFiltersContainer->layout());
@@ -289,142 +287,61 @@ void ServerInterface::applyCityFilter(const QString &city) {
         qDebug() << "Layout for applied filters container not found!";
     }
 
-    cityFilterIndex++;
+    QString query = "";
+    if (chosenOperator) {
+        query = " " + columnName + " LIKE '" + value + "'";
+    } else {
+        query = " " + columnName + " = '" + value + "'";
+    }
+
+    // Добавляем информацию о фильтре в QMap
+    appliedFilters.insert(filterWidget, query);
+    updateFilter();
+}
+
+
+void ServerInterface::applyCityFilter(const QString &city) {
+    applyFilter("IT", city, city, false);
 }
 
 void ServerInterface::applyStatusFilter(const QString &status) {
-    QSqlQueryModel *model = qobject_cast<QSqlQueryModel*>(ui->tableView->model());
-    if (!model) {
-        qDebug() << "Модель данных не найдена!";
-        return;
-    }
-
-    // Получаем текущий SQL-запрос
-    QString currentQuery = model->query().executedQuery();
-
-    // Добавляем фильтр по статусу в SQL-запрос
-    QString newQuery = currentQuery;
+    QString filterValue;
+    QString displayText;
     if (status == "Доступные") {
-        newQuery += (currentQuery.contains("WHERE") ? " AND" : " WHERE") + QString(" a2 = ''");
+        filterValue = "";
+        displayText = "Доступные";
     } else if (status == "Обновлённые") {
-        newQuery += (currentQuery.contains("WHERE") ? " AND" : " WHERE") + QString(" a1 = 'yes'");
+        filterValue = "yes";
+        displayText = "Обновлённые";
     } else if (status == "Архивированные") {
-        newQuery += (currentQuery.contains("WHERE") ? " AND" : " WHERE") + QString(" a2 = 'yes'");
+        filterValue = "yes";
+        displayText = "Архивированные";
     } else if (status == "Ошибки") {
-        newQuery += (currentQuery.contains("WHERE") ? " AND" : " WHERE") + QString(" mode = 'lg'");
+        filterValue = "lg";
+        displayText = "Ошибки";
     }
-
-    // Устанавливаем новый SQL-запрос в модель
-    model->setQuery(newQuery);
-
-    // Обновляем вид
-    ui->tableView->resizeColumnsToContents();
-
-    // Добавляем примененный фильтр в контейнер с примененными фильтрами
-    QWidget *appliedFiltersContainer = ui->appliedFilters;
-    if (!appliedFiltersContainer)
-        return;
-
-    // Создаем новый виджет для фильтра
-    QWidget *filterWidget = new QWidget(appliedFiltersContainer);
-    QString filterObjectName = "filter" + QString::number(statusFilterIndex);
-    filterWidget->setObjectName(filterObjectName);
-
-    QHBoxLayout *filterLayout = new QHBoxLayout(filterWidget);
-    filterLayout->setSpacing(5);
-    filterLayout->setContentsMargins(9, 6, 9, 6);
-
-    QLabel *filterLabel = new QLabel(status, filterWidget);
-    filterLayout->addWidget(filterLabel);
-
-    QPushButton *cancelButton = new QPushButton(filterWidget);
-    QString cancelObjectName = "cancel" + filterObjectName;
-    cancelButton->setObjectName(cancelObjectName);
-    cancelButton->setIcon(QIcon(":/buttons/icon/x-666666-color.svg"));
-    cancelButton->setIconSize(QSize(10, 10));
-    cancelButton->setFixedSize(20, 20);
-    cancelButton->setCursor(Qt::PointingHandCursor);
-    connect(cancelButton, &QPushButton::clicked, this, &ServerInterface::cancelFilter);
-    filterLayout->addWidget(cancelButton);
-
-    QHBoxLayout *appliedFiltersLayout = qobject_cast<QHBoxLayout*>(appliedFiltersContainer->layout());
-    if (appliedFiltersLayout) {
-        appliedFiltersLayout->addWidget(filterWidget);
-        appliedFiltersLayout->setAlignment(filterWidget, Qt::AlignLeft);
-    } else {
-        qDebug() << "Layout for applied filters container not found!";
-    }
-
-    statusFilterIndex++;
+    applyFilter("a1", filterValue, displayText, false);
 }
-
 
 void ServerInterface::applyTagFilter(const QString &tag) {
-    QSqlQueryModel *model = qobject_cast<QSqlQueryModel*>(ui->tableView->model());
-    if (!model) {
-        qDebug() << "Модель данных не найдена!";
-        return;
-    }
-
-    // Получаем текущий SQL-запрос
-    QString currentQuery = model->query().executedQuery();
-
-    // Добавляем фильтр по тегу в SQL-запрос
-    QString newQuery = currentQuery;
+    QString filterValue;
+    QString displayText;
     if (tag == "Клик") {
-        newQuery += (currentQuery.contains("WHERE") ? " AND" : " WHERE") + QString(" mode LIKE '%c%'");
+        filterValue = "%c%";
+        displayText = "Клик";
     } else if (tag == "Пункт") {
-        newQuery += (currentQuery.contains("WHERE") ? " AND" : " WHERE") + QString(" mode LIKE '%p%'");
+        filterValue = "%p%";
+        displayText = "Пункт";
     } else if (tag == "Аптека") {
-        newQuery += (currentQuery.contains("WHERE") ? " AND" : " WHERE") + QString(" Nkod LIKE 'a%'");
+        filterValue = "%a%";
+        displayText = "Аптека";
     } else if (tag == "Новый") {
-        newQuery += (currentQuery.contains("WHERE") ? " AND" : " WHERE") + QString(" a1 = 'yes'");
+        filterValue = "yes";
+        displayText = "Новый";
     } else if (tag == "Закрытый") {
-        newQuery += (currentQuery.contains("WHERE") ? " AND" : " WHERE") + QString(" a2 = 'yes'");
+        filterValue = "yes";
+        displayText = "Закрытый";
     }
-
-    // Устанавливаем новый SQL-запрос в модель
-    model->setQuery(newQuery);
-
-    // Обновляем вид
-    ui->tableView->resizeColumnsToContents();
-
-    // Добавляем примененный фильтр в контейнер с примененными фильтрами
-    QWidget *appliedFiltersContainer = ui->appliedFilters;
-    if (!appliedFiltersContainer)
-        return;
-
-    // Создаем новый виджет для фильтра
-    QWidget *filterWidget = new QWidget(appliedFiltersContainer);
-    QString filterObjectName = "filter" + QString::number(tagFilterIndex);
-    filterWidget->setObjectName(filterObjectName);
-
-    QHBoxLayout *filterLayout = new QHBoxLayout(filterWidget);
-    filterLayout->setSpacing(5);
-    filterLayout->setContentsMargins(9, 6, 9, 6);
-
-    QLabel *filterLabel = new QLabel(tag, filterWidget);
-    filterLayout->addWidget(filterLabel);
-
-    QPushButton *cancelButton = new QPushButton(filterWidget);
-    QString cancelObjectName = "cancel" + filterObjectName;
-    cancelButton->setObjectName(cancelObjectName);
-    cancelButton->setIcon(QIcon(":/buttons/icon/x-666666-color.svg"));
-    cancelButton->setIconSize(QSize(10, 10));
-    cancelButton->setFixedSize(20, 20);
-    cancelButton->setCursor(Qt::PointingHandCursor);
-    connect(cancelButton, &QPushButton::clicked, this, &ServerInterface::cancelFilter);
-    filterLayout->addWidget(cancelButton);
-
-    QHBoxLayout *appliedFiltersLayout = qobject_cast<QHBoxLayout*>(appliedFiltersContainer->layout());
-    if (appliedFiltersLayout) {
-        appliedFiltersLayout->addWidget(filterWidget);
-        appliedFiltersLayout->setAlignment(filterWidget, Qt::AlignLeft);
-    } else {
-        qDebug() << "Layout for applied filters container not found!";
-    }
-
-    tagFilterIndex++;
+    applyFilter("mode", filterValue, displayText, true);
 }
-
 
