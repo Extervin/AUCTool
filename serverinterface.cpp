@@ -14,16 +14,19 @@ ServerInterface::ServerInterface(QWidget *parent) :
     ui(new Ui::ServerInterface)
 {
     ui->setupUi(this);
+
     spawnTable();
     spawnMenu();
 
     // Получаем и сохраняем исходный запрос
-    QSqlQueryModel *model = qobject_cast<QSqlQueryModel*>(ui->tableView->model());
+    ObjectsTable *model = qobject_cast<ObjectsTable*>(ui->tableView->model());
     if (model) {
-        currentQuery = model->query().executedQuery();
+        currentQuery = model->getQuery(); // Используем метод getQuery() из класса ObjectsTable
     } else {
         qDebug() << "Модель данных не найдена!";
     }
+
+
 }
 
 void ServerInterface::onSwitchToggled(bool checked) {
@@ -61,9 +64,11 @@ void ServerInterface::spawnMenu() {
     QAction *filterCityAction1 = new QAction("Варна", this);
     QAction *filterCityAction2 = new QAction("Пловдив", this);
     QAction *filterCityAction3 = new QAction("София", this);
+    QAction *filterCityAction4 = new QAction("Търново", this);
     filterMenu->addAction(filterCityAction1);
     filterMenu->addAction(filterCityAction2);
     filterMenu->addAction(filterCityAction3);
+    filterMenu->addAction(filterCityAction4);
 
     // Добавляем фильтр для статуса
     QLabel *titleLabel2 = new QLabel("Статус:", this);
@@ -134,6 +139,10 @@ void ServerInterface::spawnMenu() {
         applyCityFilter("София");
     });
 
+    connect(filterCityAction4, &QAction::triggered, [=]() {
+        applyCityFilter("Търново");
+    });
+
     connect(filterStatusAction1, &QAction::triggered, [=]() {
         applyStatusFilter("Доступные");
     });
@@ -182,7 +191,6 @@ void ServerInterface::spawnTable() {
         qDebug() << "Ошибка при подключении к базе данных:" << db.lastError().text();
         return;
     }
-
     // Выполняем запрос на получение только нужных столбцов из базы данных
     QSqlQuery query;
     if (!query.exec("SELECT IP, IT, Obekt, a1, a2 FROM acc_1906")) {
@@ -190,9 +198,11 @@ void ServerInterface::spawnTable() {
         return;
     }
 
-    // Создаем модель данных QSqlQueryModel и устанавливаем результат запроса в нее
-    QSqlQueryModel *model = new QSqlQueryModel(this);
-    model->setQuery(query);
+    // Создаем экземпляр кастомной модели ObjectsTable
+    ObjectsTable *model = new ObjectsTable(this);
+
+    // Устанавливаем SQL-запрос для модели
+    model->setQuery(query.lastQuery());
 
     // Устанавливаем модель в QTableView
     ui->tableView->setModel(model);
@@ -219,7 +229,7 @@ void ServerInterface::cancelFilter(QWidget *filterWidget) {
 }
 
 void ServerInterface::updateFilter() {
-    QSqlQueryModel *model = qobject_cast<QSqlQueryModel*>(ui->tableView->model());
+    ObjectsTable *model = qobject_cast<ObjectsTable*>(ui->tableView->model());
     if (!model) {
         qDebug() << "Модель данных не найдена!";
         return;
@@ -243,11 +253,11 @@ void ServerInterface::updateFilter() {
     // Устанавливаем новый SQL-запрос в модель
     model->setQuery(newQuery);
 
+    model->rowCount();
+
     // Обновляем вид
     ui->tableView->resizeColumnsToContents();
 }
-
-
 
 void ServerInterface::applyFilter(const QString &columnName, const QString &value, const QString &displayText, const bool chosenOperator) {
     // Добавляем примененный фильтр в контейнер с примененными фильтрами
@@ -329,19 +339,23 @@ void ServerInterface::applyTagFilter(const QString &tag) {
     if (tag == "Клик") {
         filterValue = "%c%";
         displayText = "Клик";
+        applyFilter("mode", filterValue, displayText, true);
     } else if (tag == "Пункт") {
-        filterValue = "%p%";
+        filterValue = "%b%";
         displayText = "Пункт";
+        applyFilter("Nkod", filterValue, displayText, true);
     } else if (tag == "Аптека") {
         filterValue = "%a%";
         displayText = "Аптека";
+        applyFilter("Nkod", filterValue, displayText, true);
     } else if (tag == "Новый") {
-        filterValue = "yes";
+        filterValue = "%n%";
         displayText = "Новый";
+        applyFilter("mode", filterValue, displayText, true);
     } else if (tag == "Закрытый") {
-        filterValue = "yes";
+        filterValue = "%s%";
         displayText = "Закрытый";
+        applyFilter("mode", filterValue, displayText, true);
     }
-    applyFilter("mode", filterValue, displayText, true);
 }
 

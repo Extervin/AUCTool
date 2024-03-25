@@ -2,7 +2,8 @@
 #define SERVERINTERFACE_H
 
 #include <QMainWindow>
-#include "switchbutton.h" // Добавьте это
+#include "switchbutton.h"
+#include "objects_table.h"
 #include <QWidget>
 #include <QString>
 #include <QMap>
@@ -35,6 +36,7 @@ private slots:
 
 private:
     Ui::ServerInterface *ui;
+    ObjectsTable *objectsTableModel;
 
     int cityFilterIndex = 0;
     int statusFilterIndex = 0;
