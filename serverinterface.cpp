@@ -8,6 +8,9 @@
 #include <QWidgetAction>
 #include <QPainter>
 #include <QBitmap>
+#include <QtConcurrent/QtConcurrent>
+#include <QStyledItemDelegate>
+#include <QMessageBox>
 
 ServerInterface::ServerInterface(QWidget *parent) :
     QMainWindow(parent),
@@ -18,15 +21,98 @@ ServerInterface::ServerInterface(QWidget *parent) :
     spawnTable();
     spawnMenu();
 
-    // Получаем и сохраняем исходный запрос
-    ObjectsTable *model = qobject_cast<ObjectsTable*>(ui->tableView->model());
+
+
+    model = qobject_cast<ObjectsTable*>(ui->tableView->model());
     if (model) {
         currentQuery = model->getQuery(); // Используем метод getQuery() из класса ObjectsTable
     } else {
         qDebug() << "Модель данных не найдена!";
     }
+}
+
+void ServerInterface::on_searchButton_clicked()
+{
+    QString searchText = ui->searchLine->text(); // Получаем текст из QLineEdit для поиска
+    QItemSelectionModel *selectionModel = ui->tableView->selectionModel();
+
+    if (selectionModel) {
+        QModelIndexList indexes;
+        for (int i = 0; i < model->rowCount(); ++i) {
+            for (int j = 0; j < model->columnCount(); ++j) {
+                QModelIndex index = model->index(i, j);
+                QString cellText = index.data().toString();
+                if (cellText.contains(searchText, Qt::CaseInsensitive)) {
+                    indexes.append(index);
+                }
+            }
+        }
+
+        if (!indexes.isEmpty()) {
+            ui->tableView->selectionModel()->clearSelection();
+            for (const QModelIndex &index : indexes) {
+                ui->tableView->selectionModel()->select(index, QItemSelectionModel::Select);
+            }
+        } else {
+            QMessageBox::information(this, "Search", "No matches found.");
+        }
+    }
+}
+
+void ServerInterface::checkPing(const QString &ipAddress)
+{
+    QProcess process;
+    QStringList args;
+    args << "-n" << "2" << ipAddress;
+
+    process.start("ping", args);
+    process.waitForFinished();
+    qDebug() << process.readAll();
+    bool pingSuccess = (process.exitCode() == 0);
+
+    // Обновление модели данных вызывается с использованием сигнала-слота
+    emit pingResult(ipAddress, pingSuccess);
+}
+
+void ServerInterface::spawnTable() {
+    QSqlDatabase db = QSqlDatabase::addDatabase("QMYSQL");
+    db.setHostName("127.0.0.1");
+    db.setDatabaseName("dev");
+    db.setUserName("root");
+    db.setPassword("");
+
+    if (!db.open()) {
+        qDebug() << "Ошибка при подключении к базе данных:" << db.lastError().text();
+        return;
+    }
+
+    // Выполняем запрос на получение только нужных столбцов из базы данных
+    QSqlQuery query;
+    if (!query.exec("SELECT Obekt, IT, IP, a1, a2 FROM acc_1906")) {
+        qDebug() << "Ошибка выполнения запроса:" << query.lastError().text();
+        return;
+    }
+
+    // Создаем экземпляр кастомной модели ObjectsTable
 
 
+    // Устанавливаем SQL-запрос для модели
+    model->setQuery(query.lastQuery());
+
+    // Устанавливаем модель в QTableView
+    ui->tableView->setModel(model);
+
+    // Растягиваем столбцы по содержимому
+    ui->tableView->resizeColumnsToContents();
+
+    connect(this, &ServerInterface::pingResult, model, &ObjectsTable::updatePingFlag);
+
+    while (query.next()) {
+        QString ipAddress = query.value("IP").toString();
+        model->addIPAddress(ipAddress);
+        // Асинхронное выполнение функции проверки пинга
+        QFuture<void> future = QtConcurrent::run(this, &ServerInterface::checkPing, ipAddress);
+    }
 }
 
 void ServerInterface::onSwitchToggled(bool checked) {
@@ -180,38 +266,6 @@ void ServerInterface::spawnMenu() {
     });
 }
 
-void ServerInterface::spawnTable() {
-    QSqlDatabase db = QSqlDatabase::addDatabase("QMYSQL");
-    db.setHostName("127.0.0.1");
-    db.setDatabaseName("dev");
-    db.setUserName("root");
-    db.setPassword("");
-
-    if (!db.open()) {
-        qDebug() << "Ошибка при подключении к базе данных:" << db.lastError().text();
-        return;
-    }
-    // Выполняем запрос на получение только нужных столбцов из базы данных
-    QSqlQuery query;
-    if (!query.exec("SELECT IP, IT, Obekt, a1, a2 FROM acc_1906")) {
-        qDebug() << "Ошибка выполнения запроса:" << query.lastError().text();
-        return;
-    }
-
-    // Создаем экземпляр кастомной модели ObjectsTable
-    ObjectsTable *model = new ObjectsTable(this);
-
-    // Устанавливаем SQL-запрос для модели
-    model->setQuery(query.lastQuery());
-
-    // Устанавливаем модель в QTableView
-    ui->tableView->setModel(model);
-
-    // Растягиваем столбцы по содержимому
-    ui->tableView->resizeColumnsToContents();
-}
-
-
 ServerInterface::~ServerInterface()
 {
     delete ui;
@@ -358,4 +412,3 @@ void ServerInterface::applyTagFilter(const QString &tag) {
         applyFilter("mode", filterValue, displayText, true);
     }
 }
-

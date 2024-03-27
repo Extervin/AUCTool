@@ -20,6 +20,9 @@ public:
     explicit ServerInterface(QWidget *parent = nullptr);
     ~ServerInterface();
 
+signals:
+    void pingResult(const QString& ipAddress, bool pingSuccess);
+
 private slots:
     void onSwitchToggled(bool checked);
     void spawnTable();
@@ -33,10 +36,13 @@ private slots:
     void applyTagFilter(const QString &tag);
     void applyStatusFilter(const QString &status);
 
+    void checkPing(const QString &ipAddress);
+
+    void on_searchButton_clicked();
 
 private:
     Ui::ServerInterface *ui;
-    ObjectsTable *objectsTableModel;
+    ObjectsTable *model = new ObjectsTable(this);
 
     int cityFilterIndex = 0;
     int statusFilterIndex = 0;
@@ -44,7 +50,7 @@ private:
     int filterIndex = 0;
 
     QMap<QWidget*, QString> appliedFilters;
-    QString currentQuery;
+    QString currentQuery = "SELECT Obekt, IT, IP, a1, a2 FROM acc_1906";
 };
 
 #endif // SERVERINTERFACE_H
