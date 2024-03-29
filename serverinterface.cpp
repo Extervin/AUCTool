@@ -1,16 +1,16 @@
+#include <QDebug>
+#include <QAction>
+#include <QBitmap>
+#include <QKeyEvent>
+#include <QMenu>
+#include <QMessageBox>
+#include <QPainter>
+#include <QSql>
+#include <QtConcurrent/QtConcurrent>
+#include <QWidgetAction>
+#include <QToolButton>
 #include "serverinterface.h"
 #include "ui_serverinterface.h"
-#include <QtSql>
-#include <QMenu>
-#include <QAction>
-#include <QToolButton>
-#include <QDebug>
-#include <QWidgetAction>
-#include <QPainter>
-#include <QBitmap>
-#include <QtConcurrent/QtConcurrent>
-#include <QStyledItemDelegate>
-#include <QMessageBox>
 
 ServerInterface::ServerInterface(QWidget *parent) :
     QMainWindow(parent),
@@ -20,8 +20,7 @@ ServerInterface::ServerInterface(QWidget *parent) :
 
     spawnTable();
     spawnMenu();
-
-
+    ui->searchLine->installEventFilter(this);
 
     model = qobject_cast<ObjectsTable*>(ui->tableView->model());
     if (model) {
@@ -29,6 +28,26 @@ ServerInterface::ServerInterface(QWidget *parent) :
     } else {
         qDebug() << "Модель данных не найдена!";
     }
+}
+
+void ServerInterface::on_markSetManual_stateChanged(int arg1)
+{
+    model->setMarkSetManualState(arg1 == Qt::Checked);
+    ui->tableView->resizeColumnsToContents();
+}
+
+bool ServerInterface::eventFilter(QObject *obj, QEvent *event)
+{
+    if (obj == ui->searchLine && event->type() == QEvent::KeyPress)
+    {
+        QKeyEvent *keyEvent = static_cast<QKeyEvent*>(event);
+        if (keyEvent->key() == Qt::Key_Return || keyEvent->key() == Qt::Key_Enter)
+        {
+            on_searchButton_clicked();
+            return true; // Поглощаем событие
+        }
+    }
+    return false; // Передаем событие дальше для обработки другим обработчикам
 }
 
 void ServerInterface::on_searchButton_clicked()
@@ -50,14 +69,15 @@ void ServerInterface::on_searchButton_clicked()
 
         if (!indexes.isEmpty()) {
             ui->tableView->selectionModel()->clearSelection();
-            for (const QModelIndex &index : indexes) {
-                ui->tableView->selectionModel()->select(index, QItemSelectionModel::Select);
-            }
+            QModelIndex firstMatchIndex = indexes.first(); // Получаем индекс первого совпадения
+            ui->tableView->setCurrentIndex(firstMatchIndex); // Устанавливаем его как текущий индекс
+            ui->tableView->scrollTo(firstMatchIndex, QAbstractItemView::PositionAtTop); // Прокручиваем к найденному объекту
         } else {
             QMessageBox::information(this, "Search", "No matches found.");
         }
     }
 }
+
 
 void ServerInterface::checkPing(const QString &ipAddress)
 {
@@ -412,3 +432,26 @@ void ServerInterface::applyTagFilter(const QString &tag) {
         applyFilter("mode", filterValue, displayText, true);
     }
 }
+
+/*
+ *
+ * это код для чека - анчека всех чекбоксов, потом въебашу куда то.
+    if (!model)
+        return;
+
+    // Если галочка установлена
+    if (arg1 == Qt::Checked) {
+        // Обновляем данные в таблице
+        for (int row = 0; row < model->rowCount(); ++row) {
+            QModelIndex index = model->index(row, 1); // Индекс второй колонки (с чекбоксами)
+            model->setData(index, Qt::Checked, Qt::CheckStateRole); // Устанавливаем состояние чекбокса
+        }
+    } else {
+        // Если галочка не установлена
+        // Обновляем данные в таблице
+        for (int row = 0; row < model->rowCount(); ++row) {
+            QModelIndex index = model->index(row, 1); // Индекс второй колонки (с чекбоксами)
+            model->setData(index, Qt::Unchecked, Qt::CheckStateRole); // Снимаем галочку с чекбокса
+        }
+    }
+*/

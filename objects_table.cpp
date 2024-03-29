@@ -10,6 +10,16 @@ ObjectsTable::ObjectsTable(QObject *parent) : QAbstractTableModel(parent), m_que
     m_currentQuery = "";
 }
 
+void ObjectsTable::setMarkSetManualState(bool state)
+{
+    if (m_markSetManualState != state) {
+        m_markSetManualState = state;
+        beginResetModel();
+        endResetModel();
+    }
+}
+
+
 void ObjectsTable::addIPAddress(const QString &ipAddress) {
     m_pingFlags[ipAddress] = false;
 }
@@ -98,11 +108,18 @@ QVariant ObjectsTable::data(const QModelIndex &index, int role) const
         return QIcon(pixmap);
     } else if (role == Qt::CheckStateRole && index.column() == 1) {
         // Если роль - состояние флажка и это вторая колонка
-        // Возвращаем состояние флажка
-        return m_checkStates.value(index.row(), Qt::Unchecked);
+        // Проверяем значение переменной m_markSetManualState
+        if (m_markSetManualState) {
+            // Возвращаем состояние флажка, если режим установлен вручную
+            return m_checkStates.value(index.row(), Qt::Unchecked);
+        } else {
+            // Возвращаем пустое значение, чтобы скрыть чекбоксы, если режим не установлен вручную
+            return QVariant();
+        }
     }
     return QVariant();
 }
+
 
 QVariant ObjectsTable::headerData(int section, Qt::Orientation orientation, int role) const
 {
@@ -142,8 +159,11 @@ Qt::ItemFlags ObjectsTable::flags(const QModelIndex &index) const
 {
     Qt::ItemFlags flags = QAbstractTableModel::flags(index);
     if (index.column() == 1) {
-        // Устанавливаем флаги для возможности отметки во второй колонке
-        flags |= Qt::ItemIsUserCheckable | Qt::ItemIsEnabled;
+        if (m_markSetManualState == true) {
+            flags |= Qt::ItemIsUserCheckable | Qt::ItemIsEnabled;
+        } else {
+            flags &= ~(Qt::ItemIsUserCheckable);
+        }
     }
     return flags;
 }

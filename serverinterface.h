@@ -40,6 +40,9 @@ private slots:
 
     void on_searchButton_clicked();
 
+    void on_markSetManual_stateChanged(int arg1);
+    bool eventFilter(QObject *obj, QEvent *event);
+
 private:
     Ui::ServerInterface *ui;
     ObjectsTable *model = new ObjectsTable(this);

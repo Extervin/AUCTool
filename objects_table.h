@@ -18,6 +18,8 @@ public slots:
 public:
     explicit ObjectsTable(QObject *parent = nullptr);
 
+    void setMarkSetManualState(bool state);
+
     // Переопределяем функции из QAbstractTableModel
     int rowCount(const QModelIndex &parent = QModelIndex()) const override;
     int columnCount(const QModelIndex &parent = QModelIndex()) const override;
@@ -38,6 +40,7 @@ private:
     QSqlQueryModel *m_queryModel;
     QString m_currentQuery;
     QMap<int, Qt::CheckState> m_checkStates; // Переменная для хранения состояний чекбоксов
+    bool m_markSetManualState = false;
 
 };
 
