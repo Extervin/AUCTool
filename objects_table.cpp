@@ -70,7 +70,7 @@ int ObjectsTable::rowCount(const QModelIndex &parent) const
 
 int ObjectsTable::columnCount(const QModelIndex &parent) const
 {
-    return m_queryModel->columnCount(parent) + 1; // Добавляем одну дополнительную колонку
+    return m_queryModel->columnCount(parent); // Добавляем одну дополнительную колонку
 }
 
 QVariant ObjectsTable::data(const QModelIndex &index, int role) const
@@ -79,14 +79,7 @@ QVariant ObjectsTable::data(const QModelIndex &index, int role) const
         return QVariant();
 
     if (role == Qt::DisplayRole) {
-        // Если роль - отображение данных
-        if (index.column() == 0) {
-            // Для первой колонки возвращаем пустые значения
-            return QVariant();
-        } else {
-            // Возвращаем данные из результирующего набора запроса
-            return m_queryModel->data(this->index(index.row(), index.column() - 1));
-        }
+        return m_queryModel->data(this->index(index.row(), index.column()));
     } else if (role == Qt::DecorationRole && index.column() == 0) {
         // Если роль - декорация и это первая колонка
         QString ipAddress = m_queryModel->data(this->index(index.row(), 2)).toString(); // Получаем IP-адрес объекта
@@ -106,7 +99,7 @@ QVariant ObjectsTable::data(const QModelIndex &index, int role) const
         painter.drawEllipse((iconSize - 2 * radius) / 2, (iconSize - 2 * radius) / 2, 2 * radius, 2 * radius);
 
         return QIcon(pixmap);
-    } else if (role == Qt::CheckStateRole && index.column() == 1) {
+    } else if (role == Qt::CheckStateRole && index.column() == 0) {
         // Если роль - состояние флажка и это вторая колонка
         // Проверяем значение переменной m_markSetManualState
         if (m_markSetManualState) {
@@ -120,20 +113,14 @@ QVariant ObjectsTable::data(const QModelIndex &index, int role) const
     return QVariant();
 }
 
-
 QVariant ObjectsTable::headerData(int section, Qt::Orientation orientation, int role) const
 {
     if (role != Qt::DisplayRole)
         return QVariant();
 
     if (orientation == Qt::Horizontal) {
-        if (section == 0) {
-            // Заголовок для первой колонки
-            return QVariant();
-        } else {
-            // Заголовки для остальных колонок берем из результирующего набора запроса
-            return m_queryModel->headerData(section - 1, orientation, role);
-        }
+        // Заголовки для всех колонок берем из результирующего набора запроса
+        return m_queryModel->headerData(section, orientation, role);
     } else {
         // Возвращаем номер строки для вертикальных заголовков (если необходимо)
         return section + 1;
@@ -158,7 +145,7 @@ void ObjectsTable::setQuery(const QString &query)
 Qt::ItemFlags ObjectsTable::flags(const QModelIndex &index) const
 {
     Qt::ItemFlags flags = QAbstractTableModel::flags(index);
-    if (index.column() == 1) {
+    if (index.column() == 0) {
         if (m_markSetManualState == true) {
             flags |= Qt::ItemIsUserCheckable | Qt::ItemIsEnabled;
         } else {
@@ -170,7 +157,7 @@ Qt::ItemFlags ObjectsTable::flags(const QModelIndex &index) const
 
 bool ObjectsTable::setData(const QModelIndex &index, const QVariant &value, int role)
 {
-    if (role == Qt::CheckStateRole && index.column() == 1) {
+    if (role == Qt::CheckStateRole && index.column() == 0) {
         // Устанавливаем состояние флажка для второй колонки
         m_checkStates[index.row()] = (value == Qt::Checked ? Qt::Checked : Qt::Unchecked);
         // Уведомляем о изменении данных
@@ -179,4 +166,19 @@ bool ObjectsTable::setData(const QModelIndex &index, const QVariant &value, int 
     }
     return false;
 }
+
+QList<QString> ObjectsTable::getSelectedIPs() const {
+    QList<QString> selectedIPs;
+    for (int row = 0; row < rowCount(); ++row) {
+        QModelIndex index = this->index(row, 0); // Первая колонка с чекбоксами
+        if (data(index, Qt::CheckStateRole) == Qt::Checked) {
+            // Если чекбокс отмечен, добавляем айпи в список выбранных
+            QModelIndex ipIndex = this->index(row, 2); // Индекс колонки с айпи
+            QString ipAddress = data(ipIndex, Qt::DisplayRole).toString();
+            selectedIPs.append(ipAddress);
+        }
+    }
+    return selectedIPs;
+}
+
 

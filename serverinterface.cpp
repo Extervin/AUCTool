@@ -1,3 +1,4 @@
+#include <fileoperations.h>
 #include <QDebug>
 #include <QAction>
 #include <QBitmap>
@@ -6,9 +7,13 @@
 #include <QMessageBox>
 #include <QPainter>
 #include <QSql>
+#include <QSqlError>
+#include <QSqlQuery>
 #include <QtConcurrent/QtConcurrent>
 #include <QWidgetAction>
 #include <QToolButton>
+#include <QTcpSocket>
+#include <QTimer>
 #include "serverinterface.h"
 #include "ui_serverinterface.h"
 
@@ -28,6 +33,31 @@ ServerInterface::ServerInterface(QWidget *parent) :
     } else {
         qDebug() << "Модель данных не найдена!";
     }
+}
+
+void ServerInterface::on_serverUpdateButton_clicked()
+{
+    QList<QString> ipList = model->getSelectedIPs();
+    qDebug() << ipList;
+    updateServerFiles(false);
+}
+
+void ServerInterface::updateServerFiles(const bool closeFlag) {
+    QList<QString> ipList = model->getSelectedIPs();
+    QList<QFuture<void>> futures;
+    for (const auto& IPAddress : ipList) {
+        futures.append(QtConcurrent::run([=]() {
+            FileOperations server;
+            server.connectToNetworkShare(IPAddress, "d$", "tsysadm", "Tsysadm@", closeFlag);
+            connect(&server, &FileOperations::copyFinished, this, &ServerInterface::handleCopyFinished);
+        }));
+    }
+}
+
+void ServerInterface::handleCopyFinished(const QString &ipAddress, const QString &share) {
+    // Выполните здесь необходимые действия после завершения копирования файлов, например, отключение от сетевой шары
+    qDebug() << "Copying files finished for IP:" << ipAddress << "and share:" << share;
+    // ...
 }
 
 void ServerInterface::on_markSetManual_stateChanged(int arg1)
@@ -78,21 +108,30 @@ void ServerInterface::on_searchButton_clicked()
     }
 }
 
+void ServerInterface::checkPingInMainThread(const QString &ipAddress) {
+    // Создаем сокет без указания родителя
+    QTcpSocket *socket = new QTcpSocket();
 
-void ServerInterface::checkPing(const QString &ipAddress)
-{
-    QProcess process;
-    QStringList args;
-    args << "-n" << "2" << ipAddress;
+    // Подключаем сигналы и слоты для обработки результатов проверки пинга
+    connect(socket, &QTcpSocket::connected, this, [=]() {
+        qDebug() << ipAddress << "is reachable";
+        socket->disconnectFromHost();
+        emit pingResult(ipAddress, true);
+        socket->deleteLater(); // Удаляем сокет после использования
+    });
 
-    process.start("ping", args);
-    process.waitForFinished();
-    qDebug() << process.readAll();
-    bool pingSuccess = (process.exitCode() == 0);
+    connect(socket, &QTcpSocket::errorOccurred, this, [=](QAbstractSocket::SocketError socketError) {
+        qDebug() << ipAddress << "is unreachable (error: " << socketError << ")";
+        emit pingResult(ipAddress, false);
+        socket->deleteLater(); // Удаляем сокет после использования
+    });
 
-    // Обновление модели данных вызывается с использованием сигнала-слота
-    emit pingResult(ipAddress, pingSuccess);
+    // Устанавливаем соединение
+    socket->connectToHost(ipAddress, 3389);
+
+    // Проверка соединения происходит асинхронно, результаты будут обработаны в сигналах и слотах
 }
+
 
 void ServerInterface::spawnTable() {
     QSqlDatabase db = QSqlDatabase::addDatabase("QMYSQL");
@@ -108,13 +147,10 @@ void ServerInterface::spawnTable() {
 
     // Выполняем запрос на получение только нужных столбцов из базы данных
     QSqlQuery query;
-    if (!query.exec("SELECT Obekt, IT, IP, a1, a2 FROM acc_1906")) {
+    if (!query.exec("SELECT Obekt, IT, IP, a1, a2 FROM acc_blank")) {
         qDebug() << "Ошибка выполнения запроса:" << query.lastError().text();
         return;
     }
-
-    // Создаем экземпляр кастомной модели ObjectsTable
-
 
     // Устанавливаем SQL-запрос для модели
     model->setQuery(query.lastQuery());
@@ -130,8 +166,8 @@ void ServerInterface::spawnTable() {
     while (query.next()) {
         QString ipAddress = query.value("IP").toString();
         model->addIPAddress(ipAddress);
-        // Асинхронное выполнение функции проверки пинга
-        QFuture<void> future = QtConcurrent::run(this, &ServerInterface::checkPing, ipAddress);
+        // Вызываем метод для выполнения проверки пинга в основном потоке
+        QMetaObject::invokeMethod(this, "checkPingInMainThread", Qt::QueuedConnection, Q_ARG(QString, ipAddress));
     }
 }
 
@@ -286,11 +322,6 @@ void ServerInterface::spawnMenu() {
     });
 }
 
-ServerInterface::~ServerInterface()
-{
-    delete ui;
-}
-
 void ServerInterface::cancelFilter(QWidget *filterWidget) {
     if (filterWidget) {
         // Удаляем виджет из контейнера
@@ -433,6 +464,13 @@ void ServerInterface::applyTagFilter(const QString &tag) {
     }
 }
 
+ServerInterface::~ServerInterface()
+{
+    delete ui;
+}
+
+
+
 /*
  *
  * это код для чека - анчека всех чекбоксов, потом въебашу куда то.
@@ -455,3 +493,4 @@ void ServerInterface::applyTagFilter(const QString &tag) {
         }
     }
 */
+

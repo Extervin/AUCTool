@@ -19,6 +19,8 @@ class ServerInterface : public QMainWindow
 public:
     explicit ServerInterface(QWidget *parent = nullptr);
     ~ServerInterface();
+public slots:
+    void handleCopyFinished(const QString &ipAddress, const QString &share);
 
 signals:
     void pingResult(const QString& ipAddress, bool pingSuccess);
@@ -36,12 +38,16 @@ private slots:
     void applyTagFilter(const QString &tag);
     void applyStatusFilter(const QString &status);
 
-    void checkPing(const QString &ipAddress);
+    void checkPingInMainThread(const QString &ipAddress);
 
     void on_searchButton_clicked();
 
+    void updateServerFiles(const bool closeFlag);
+
     void on_markSetManual_stateChanged(int arg1);
     bool eventFilter(QObject *obj, QEvent *event);
+
+    void on_serverUpdateButton_clicked();
 
 private:
     Ui::ServerInterface *ui;
@@ -53,7 +59,7 @@ private:
     int filterIndex = 0;
 
     QMap<QWidget*, QString> appliedFilters;
-    QString currentQuery = "SELECT Obekt, IT, IP, a1, a2 FROM acc_1906";
+    QString currentQuery = "SELECT Obekt, IT, IP, a1, a2 FROM acc_blank";
 };
 
 #endif // SERVERINTERFACE_H
