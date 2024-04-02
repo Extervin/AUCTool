@@ -35,20 +35,17 @@ void FileOperations::closeAndUpdateInBackground(const QString& sourcePath, const
     //disconnectFromNetworkShare();
 }
 
-void FileOperations::connectToNetworkShare(const QString& ipAddress, const QString& share, const QString& username, const QString& password, const bool closeFlag) {
+void FileOperations::connectToNetworkShare(const QString& ipAddress, const QString& share, const QString& username, const QString& password, const bool closeFlag, const QString source) {
     QString connectCommand = QString("net use \\\\%1\\%2 /user:%3 %4").arg(ipAddress, share, username, password);
     int result = QProcess::execute(connectCommand);
-    if (result == 0) {
         qDebug() << "Connected to " + ipAddress + " successfully.";
+        emit debugInfo("Connected to " + ipAddress + " successfully.");
         if (closeFlag == true) {
             closeDrugProcess(ipAddress, share, username, password);
-            copyFilesToTemp("C:\\Test\\copy\\source", QString("\\\\%1\\%2\\Test\\targetContainer").arg(ipAddress).arg(share), ipAddress, share);
+            copyFilesToTemp(source, QString("\\\\%1\\%2\\DRUG\\Users").arg(ipAddress, share), ipAddress, share);
         } else {
-            copyFilesToTemp("C:\\Test\\copy\\source", QString("\\\\%1\\%2\\Test\\targetContainer").arg(ipAddress).arg(share), ipAddress, share);
+            copyFilesToTemp(source, QString("\\\\%1\\%2\\DRUG\\Users").arg(ipAddress, share), ipAddress, share);
         }
-    } else {
-        qDebug() << "Failed to connect to " + ipAddress;
-    }
 }
 
 void FileOperations::closeDrugProcess(const QString& ipAddress, const QString& share, const QString& username, const QString& password) {
@@ -97,6 +94,7 @@ void FileOperations::copyFilesToTemp(const QString &sourceDirPath, const QString
         }
 
         qDebug() << "Copied file:" << sourceFilePath << "to" << destinationFilePath;
+        emit debugInfo("Copied file:" + sourceFilePath + "to" + destinationFilePath);
     }
     copyTempToAllSubdirectories(tempDirPath, targetDirPath, ipAddress, share);
 }
@@ -119,6 +117,7 @@ void FileOperations::copyTempToAllSubdirectories(const QString &tempDirPath, con
     foreach (const QString &subDirectory, subDirectories) {
         if (subDirectory == "temp") {
             qDebug() << "Skipping 'temp' directory: " << targetDir.absoluteFilePath(subDirectory);
+            emit debugInfo("Skipping 'temp' directory");
             continue;
         }
 
@@ -152,6 +151,7 @@ void FileOperations::copyTempToAllSubdirectories(const QString &tempDirPath, con
             }
 
             qDebug() << "Copied file:" << sourceFilePath << "to" << destinationFilePath;
+            emit debugInfo("Copied file:" + sourceFilePath + "to" + destinationFilePath);
         }
     }
     removeTempDirectory(tempDirPath, ipAddress, share);
@@ -166,6 +166,7 @@ void FileOperations::removeTempDirectory(QString tempDirPath, const QString& ipA
             // Добавить еррор кейс
         }
         qDebug() << "Removed temp directory:" << tempDirPath;
+        emit debugInfo("Removed temp directory");
     } else {
         qDebug() << "Temp directory does not exist: " << tempDirPath;
         // Добавить еррор кейс
@@ -223,6 +224,7 @@ void FileOperations::updateVersionFile(const QString &sourceDirPath, const QStri
 
     file.close();
     qDebug() << "Finished updating file information.";
+    emit debugInfo("Finished updating file information.");
     disconnectFromNetworkShare(ipAddress, share);
     emit copyFinished(ipAddress, share);
 }
@@ -232,6 +234,7 @@ void FileOperations::disconnectFromNetworkShare(const QString& ipAddress, const 
     int result = QProcess::execute(disconnectCommand);
     if (result == 0) {
         qDebug() << "Disconnected from server successfully.";
+        emit debugInfo("Disconnected from server successfully.");
     } else {
         qDebug() << "Failed to disconnect from server";
     }

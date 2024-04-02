@@ -441,9 +441,6 @@ QComboBox::drop-down {
       </layout>
      </widget>
     </item>
-    <item row="3" column="2" rowspan="2">
-     <widget class="QTreeView" name="errorTreeView"/>
-    </item>
     <item row="0" column="2" rowspan="3">
      <widget class="QTabWidget" name="tabWidget">
       <property name="sizePolicy">
@@ -486,7 +483,7 @@ QComboBox::drop-down {
        </attribute>
        <layout class="QVBoxLayout" name="verticalLayout_3">
         <item>
-         <widget class="QTextBrowser" name="textBrowser_2">
+         <widget class="QTextBrowser" name="debug">
           <property name="html">
            <string>&lt;!DOCTYPE HTML PUBLIC &quot;-//W3C//DTD HTML 4.0//EN&quot; &quot;http://www.w3.org/TR/REC-html40/strict.dtd&quot;&gt;
 &lt;html&gt;&lt;head&gt;&lt;meta name=&quot;qrichtext&quot; content=&quot;1&quot; /&gt;&lt;meta charset=&quot;utf-8&quot; /&gt;&lt;style type=&quot;text/css&quot;&gt;
@@ -526,6 +523,9 @@ li.checked::marker { content: &quot;\2612&quot;; }
        </layout>
       </widget>
      </widget>
+    </item>
+    <item row="3" column="2" rowspan="2">
+     <widget class="QTreeWidget" name="errorTreeWidget"/>
     </item>
    </layout>
   </widget>

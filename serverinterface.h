@@ -22,6 +22,10 @@ public:
 public slots:
     void handleCopyFinished(const QString &ipAddress, const QString &share);
 
+    void receiveData(const QString& newLogin, const QString &newPassword, const bool newFlag, const QString source);
+
+    void receiveDebugInfo(const QString& info);
+
 signals:
     void pingResult(const QString& ipAddress, bool pingSuccess);
 
@@ -42,7 +46,7 @@ private slots:
 
     void on_searchButton_clicked();
 
-    void updateServerFiles(const bool closeFlag);
+    void updateServerFiles(const bool closeFlag, const QString &login, const QString &password, const QString source);
 
     void on_markSetManual_stateChanged(int arg1);
     bool eventFilter(QObject *obj, QEvent *event);
@@ -60,6 +64,11 @@ private:
 
     QMap<QWidget*, QString> appliedFilters;
     QString currentQuery = "SELECT Obekt, IT, IP, a1, a2 FROM acc_blank";
+
+    QString login = "";
+    QString password = "";
+    bool closeDrugFlag = false;
+    QList<QString> fileList;
 };
 
 #endif // SERVERINTERFACE_H

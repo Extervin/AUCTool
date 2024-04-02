@@ -1,3 +1,4 @@
+#include <confirmation.h>
 #include <fileoperations.h>
 #include <QDebug>
 #include <QAction>
@@ -33,23 +34,48 @@ ServerInterface::ServerInterface(QWidget *parent) :
     } else {
         qDebug() << "Модель данных не найдена!";
     }
+
+    // Устанавливаем количество столбцов в errorTreeWidget
+    ui->errorTreeWidget->setColumnCount(2);
+
+    // Устанавливаем заголовки столбцов
+    ui->errorTreeWidget->setHeaderLabels({"Тип ошибки", "Текст ошибки"});
+
 }
+
+void ServerInterface::receiveDebugInfo(const QString& info) {
+    // Вывод дебаг-информации в QTextBrowser
+    ui->debug->append(info);
+}
+
+void ServerInterface::receiveData(const QString& newLogin, const QString& newPassword, const bool newFlag, const QString source) {
+    qDebug() << newLogin << " " << newPassword << " " << newFlag << " " << source;
+    updateServerFiles(newFlag, newLogin, newPassword, source);
+}
+
 
 void ServerInterface::on_serverUpdateButton_clicked()
 {
     QList<QString> ipList = model->getSelectedIPs();
-    qDebug() << ipList;
-    updateServerFiles(false);
+    Confirmation dialog(this, ipList);
+    dialog.exec();
 }
 
-void ServerInterface::updateServerFiles(const bool closeFlag) {
+void ServerInterface::updateServerFiles(const bool closeFlag, const QString& login, const QString& password, const QString source) {
+
     QList<QString> ipList = model->getSelectedIPs();
+
     QList<QFuture<void>> futures;
     for (const auto& IPAddress : ipList) {
         futures.append(QtConcurrent::run([=]() {
-            FileOperations server;
-            server.connectToNetworkShare(IPAddress, "d$", "tsysadm", "Tsysadm@", closeFlag);
+            FileOperations server = new FileOperations();
+
+            connect(&server, &FileOperations::debugInfo, this, &ServerInterface::receiveDebugInfo);
+
+            server.connectToNetworkShare(IPAddress, "d$", login, password, closeFlag, source);
+
             connect(&server, &FileOperations::copyFinished, this, &ServerInterface::handleCopyFinished);
+
         }));
     }
 }
@@ -135,13 +161,19 @@ void ServerInterface::checkPingInMainThread(const QString &ipAddress) {
 
 void ServerInterface::spawnTable() {
     QSqlDatabase db = QSqlDatabase::addDatabase("QMYSQL");
-    db.setHostName("127.0.0.1");
+    db.setHostName("192.168.0.115");
     db.setDatabaseName("dev");
-    db.setUserName("root");
+    db.setUserName("global");
     db.setPassword("");
 
     if (!db.open()) {
         qDebug() << "Ошибка при подключении к базе данных:" << db.lastError().text();
+
+        // Создаем элемент в errorTreeWidget с текстом ошибки и добавляем его
+        QTreeWidgetItem *errorItem = new QTreeWidgetItem(ui->errorTreeWidget);
+        errorItem->setText(0, "Ошибка при подключении к базе данных");
+        errorItem->setText(1, db.lastError().text());
+
         return;
     }
 
@@ -149,6 +181,12 @@ void ServerInterface::spawnTable() {
     QSqlQuery query;
     if (!query.exec("SELECT Obekt, IT, IP, a1, a2 FROM acc_blank")) {
         qDebug() << "Ошибка выполнения запроса:" << query.lastError().text();
+
+        // Создаем элемент в errorTreeWidget с текстом ошибки и добавляем его
+        QTreeWidgetItem *errorItem = new QTreeWidgetItem(ui->errorTreeWidget);
+        errorItem->setText(0, "Ошибка выполнения запроса");
+        errorItem->setText(1, query.lastError().text());
+
         return;
     }
 
@@ -170,6 +208,7 @@ void ServerInterface::spawnTable() {
         QMetaObject::invokeMethod(this, "checkPingInMainThread", Qt::QueuedConnection, Q_ARG(QString, ipAddress));
     }
 }
+
 
 void ServerInterface::onSwitchToggled(bool checked) {
     Q_UNUSED(checked);

@@ -11,6 +11,7 @@ SOURCES += \
     fileoperations.cpp \
     main.cpp \
     objects_table.cpp \
+    progressdialog.cpp \
     serverinterface.cpp \
     switchbutton.cpp
 
@@ -18,11 +19,13 @@ HEADERS += \
     confirmation.h \
     fileoperations.h \
     objects_table.h \
+    progressdialog.h \
     serverinterface.h \
     switchbutton.h
 
 FORMS += \
     confirmation.ui \
+    progressdialog.ui \
     serverinterface.ui
 
 TRANSLATIONS += \
