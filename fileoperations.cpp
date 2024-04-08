@@ -9,44 +9,57 @@ FileOperations::FileOperations(QObject *parent) : QObject(parent) {
 
 }
 
-void FileOperations::closeAndUpdateInBackground(const QString& sourcePath, const QStringList& ipAddresses, const QString& username, const QString& password, QVector<int> rowID) {
-    // Отключаемся от сетевой шары перед началом работы
-    //disconnectFromNetworkShare();
-
-    QString tempDirForIP = "Z:\\temp"; // Создаем временную директорию для конкретного IP-адреса
-
-    // Подключаемся к сетевой шаре с использованием переданных учетных данных и IP-адреса
-    //connectToNetworkShare(ipAddress, "serverupdatepath", username, password);
-
-    // Копируем файлы из исходной директории во временную директорию для текущего IP-адреса
-    //copyFilesToTemp(sourcePath, tempDirForIP);
-
-    // Закрываем процессы drug.exe на удаленной машине
-
-    // Копируем содержимое временной директории в поддиректории на удаленной машине
-    //copyTempToAllSubdirectories(tempDirForIP, "Z:\\");
-
-    // Обновляем версионный файл на удаленной машине
-    //updateVersionFile(sourcePath, "Z:\\");
-
-    // Удаляем временную директорию для текущего IP-адреса
-    //removeTempDirectory(tempDirForIP);
-
-    //disconnectFromNetworkShare();
-}
-
 void FileOperations::connectToNetworkShare(const QString& ipAddress, const QString& share, const QString& username, const QString& password, const bool closeFlag, const QString source) {
-    QString connectCommand = QString("net use \\\\%1\\%2 /user:%3 %4").arg(ipAddress, share, username, password);
-    int result = QProcess::execute(connectCommand);
-        qDebug() << "Connected to " + ipAddress + " successfully.";
-        emit debugInfo("Connected to " + ipAddress + " successfully.");
-        if (closeFlag == true) {
+    // Проверяем состояние подключения к сетевому ресурсу
+    QString checkConnectionCommand = QString("net use \\\\%1\\%2").arg(ipAddress, share);
+
+    QProcess checkProcess;
+    checkProcess.start(checkConnectionCommand);
+    checkProcess.waitForFinished(-1); // Ждем завершения выполнения процесса
+
+    int checkResult = checkProcess.exitCode(); // Получаем код завершения
+
+    if (checkResult == 0) { // Код 0 означает успешное выполнение команды
+        qDebug() << "Already connected to " + ipAddress + ".";
+        emit debugInfo(ipAddress + ": already connected.");
+
+        // Выполняем действия, например, копирование файлов
+        if (closeFlag) {
             closeDrugProcess(ipAddress, share, username, password);
             copyFilesToTemp(source, QString("\\\\%1\\%2\\DRUG\\Users").arg(ipAddress, share), ipAddress, share);
         } else {
             copyFilesToTemp(source, QString("\\\\%1\\%2\\DRUG\\Users").arg(ipAddress, share), ipAddress, share);
         }
+    } else {
+        // Если не подключены, выполняем команду подключения
+        QString connectCommand = QString("net use \\\\%1\\%2 /user:%3 %4").arg(ipAddress, share, username, password);
+
+        QProcess process;
+        process.start(connectCommand);
+        process.waitForFinished(-1); // Ждем завершения выполнения процесса
+
+        int result = process.exitCode(); // Получаем код завершения
+
+        if (result == 0) { // Код 0 означает успешное выполнение команды
+            qDebug() << "Connected to " + ipAddress + " successfully.";
+            emit debugInfo(ipAddress + ": connected successfully.");
+
+            // Выполняем действия после успешного подключения
+            if (closeFlag) {
+                closeDrugProcess(ipAddress, share, username, password);
+                copyFilesToTemp(source, QString("\\\\%1\\%2\\DRUG\\Users").arg(ipAddress, share), ipAddress, share);
+            } else {
+                copyFilesToTemp(source, QString("\\\\%1\\%2\\DRUG\\Users").arg(ipAddress, share), ipAddress, share);
+            }
+        } else {
+            qDebug() << "Failed to connect to " + ipAddress + ".";
+            emit debugInfo(ipAddress + ": failed to connect.");
+            // Обработка ошибки подключения к сетевой шаре
+            emit copyFinished(ipAddress, 1);
+        }
+    }
 }
+
 
 void FileOperations::closeDrugProcess(const QString& ipAddress, const QString& share, const QString& username, const QString& password) {
     QString processName = "drug.exe"; // Имя процесса для завершения
@@ -55,6 +68,7 @@ void FileOperations::closeDrugProcess(const QString& ipAddress, const QString& s
     QProcess process;
     process.start("cmd.exe", QStringList() << "/C" << command);
     process.waitForFinished(-1);
+    emit debugInfo(ipAddress + ": closed drug.exe.");
 }
 
 void FileOperations::copyFilesToTemp(const QString &sourceDirPath, const QString &targetDirPath, const QString& ipAddress, const QString& share) {
@@ -64,6 +78,9 @@ void FileOperations::copyFilesToTemp(const QString &sourceDirPath, const QString
 
     if (!sourceDir.exists()) {
         qDebug() << "Source directory does not exist: " << sourceDirPath;
+        emit debugInfo(ipAddress + ": source directory does not exist.");
+        emit copyFinished(ipAddress, 1);
+        disconnectFromNetworkShare(ipAddress, share);
         return;
     }
 
@@ -71,6 +88,9 @@ void FileOperations::copyFilesToTemp(const QString &sourceDirPath, const QString
     if (tempDir.exists()) {
         if (!tempDir.removeRecursively()) {
             qDebug() << "Failed to remove existing temp directory: " << tempDirPath;
+            emit debugInfo(ipAddress + ": failed to remove existing temp directory.");
+            emit copyFinished(ipAddress, 1);
+            disconnectFromNetworkShare(ipAddress, share);
             return;
         }
     }
@@ -78,6 +98,9 @@ void FileOperations::copyFilesToTemp(const QString &sourceDirPath, const QString
     // Создаем временную папку
     if (!tempDir.mkpath(".")) {
         qDebug() << "Failed to create temp directory: " << tempDirPath;
+        emit debugInfo(ipAddress + ": failed to create temp directory.");
+        emit copyFinished(ipAddress, 1);
+        disconnectFromNetworkShare(ipAddress, share);
         return;
     }
 
@@ -89,12 +112,14 @@ void FileOperations::copyFilesToTemp(const QString &sourceDirPath, const QString
 
         // Копируем файлы из источника во временную папку
         if (!QFile::copy(sourceFilePath, destinationFilePath)) {
-            qDebug() << "Failed to copy file:" << sourceFilePath << "to" << destinationFilePath;
+            qDebug() << "Failed to copy file: " << sourceFilePath << " to " << destinationFilePath;
+            emit debugInfo(ipAddress + ": failed to copy file " + sourceFilePath + " to " + destinationFilePath);
+            emit copyFinished(ipAddress, 2);
             continue;
         }
 
-        qDebug() << "Copied file:" << sourceFilePath << "to" << destinationFilePath;
-        emit debugInfo("Copied file:" + sourceFilePath + "to" + destinationFilePath);
+        qDebug() << "Copied file: " << sourceFilePath << " to " << destinationFilePath;
+        emit debugInfo(ipAddress + ": copied file " + sourceFilePath + " to " + destinationFilePath + " successfully.");
     }
     copyTempToAllSubdirectories(tempDirPath, targetDirPath, ipAddress, share);
 }
@@ -105,11 +130,15 @@ void FileOperations::copyTempToAllSubdirectories(const QString &tempDirPath, con
 
     if (!tempDir.exists()) {
         qDebug() << "Temp directory does not exist: " << tempDirPath;
+        emit debugInfo(ipAddress + ": temp directory does not exist.");
+        emit copyFinished(ipAddress, 2);
         return;
     }
 
     if (!targetDir.exists()) {
         qDebug() << "Target directory does not exist: " << targetDirPath;
+        emit debugInfo(ipAddress + ": target directory does not exist.");
+        emit copyFinished(ipAddress, 2);
         return;
     }
 
@@ -117,7 +146,7 @@ void FileOperations::copyTempToAllSubdirectories(const QString &tempDirPath, con
     foreach (const QString &subDirectory, subDirectories) {
         if (subDirectory == "temp") {
             qDebug() << "Skipping 'temp' directory: " << targetDir.absoluteFilePath(subDirectory);
-            emit debugInfo("Skipping 'temp' directory");
+            emit debugInfo(ipAddress + ": skipping 'temp' directory.");
             continue;
         }
 
@@ -126,6 +155,8 @@ void FileOperations::copyTempToAllSubdirectories(const QString &tempDirPath, con
         QDir destinationDir(destinationPath);
         if (!destinationDir.exists()) {
             qDebug() << "Destination directory does not exist: " << destinationPath;
+            emit debugInfo(ipAddress + ": destination directory does not exist.");
+            emit copyFinished(ipAddress, 2);
             //Вставить еррор кейс
             continue;
         }
@@ -140,18 +171,22 @@ void FileOperations::copyTempToAllSubdirectories(const QString &tempDirPath, con
                 if (!QFile::remove(destinationFilePath)) {
                     qDebug() << "Failed to remove existing file:" << destinationFilePath;
                     // Вставить еррор кейс
+                    emit debugInfo(ipAddress + ": failed to remove existing file " + destinationFilePath);
+                    emit copyFinished(ipAddress, 2);
                     continue;
                 }
             }
 
             if (!QFile::copy(sourceFilePath, destinationFilePath)) {
                 qDebug() << "Failed to copy file:" << sourceFilePath << "to" << destinationFilePath;
+                emit debugInfo(ipAddress + ": failed to copy file " + sourceFilePath + " to " + destinationFilePath);
+                emit copyFinished(ipAddress, 2);
                 // Вставить еррор кейс
                 continue;
             }
 
             qDebug() << "Copied file:" << sourceFilePath << "to" << destinationFilePath;
-            emit debugInfo("Copied file:" + sourceFilePath + "to" + destinationFilePath);
+            emit debugInfo(ipAddress + ": copied file " + sourceFilePath + " to " + destinationFilePath + " successfully.");
         }
     }
     removeTempDirectory(tempDirPath, ipAddress, share);
@@ -163,12 +198,17 @@ void FileOperations::removeTempDirectory(QString tempDirPath, const QString& ipA
     if (tempDir.exists()) {
         if (!tempDir.removeRecursively()) {
             qDebug() << "Failed to remove temp directory: " << tempDirPath;
+            emit debugInfo(ipAddress + ": failed to removed temp directory.");
+            emit copyFinished(ipAddress, 2);
             // Добавить еррор кейс
+
         }
         qDebug() << "Removed temp directory:" << tempDirPath;
-        emit debugInfo("Removed temp directory");
+        emit debugInfo(ipAddress + ": removed temp directory successfully.");
     } else {
         qDebug() << "Temp directory does not exist: " << tempDirPath;
+        emit debugInfo(ipAddress + ": temp directory does not exist.");
+        emit copyFinished(ipAddress, 2);
         // Добавить еррор кейс
     }
     updateVersionFile("C:\\Test\\copy\\source", tempDirPath.remove("\\temp"), ipAddress, share);
@@ -180,6 +220,9 @@ void FileOperations::updateVersionFile(const QString &sourceDirPath, const QStri
 
     if (!file.open(QIODevice::ReadWrite | QIODevice::Text)) {
         qDebug() << "Failed to open file for writing.";
+        emit debugInfo(ipAddress + ": failed to open version file for writing.");
+        emit copyFinished(ipAddress, 2);
+        disconnectFromNetworkShare(ipAddress, share);
         return;
     }
 
@@ -198,7 +241,10 @@ void FileOperations::updateVersionFile(const QString &sourceDirPath, const QStri
     QDir sourceDir(sourceDirPath);
     if (!sourceDir.exists()) {
         qDebug() << "Source directory does not exist.";
+        emit debugInfo(ipAddress + ": source directory " + sourceDirPath + " does not exist.");
         file.close();
+        emit copyFinished(ipAddress, 2);
+        disconnectFromNetworkShare(ipAddress, share);
         return;
     }
 
@@ -214,19 +260,21 @@ void FileOperations::updateVersionFile(const QString &sourceDirPath, const QStri
             if (existingFiles[fileName] != lastModified.toString()) {
                 out << fileName << " - Last modified: " << lastModified.toString() << "\n";
                 qDebug() << "Updated file information for" << fileName;
+                emit debugInfo(ipAddress + ": updated file information for " + fileName + " successfully.");
             }
         } else {
             // Если файла не было в списке, добавляем его
             out << fileName << " - Last modified: " << lastModified.toString() << "\n";
             qDebug() << "Added file information for" << fileName;
+            emit debugInfo(ipAddress + ": added file information for " + fileName + " successfully.");
         }
     }
 
     file.close();
     qDebug() << "Finished updating file information.";
-    emit debugInfo("Finished updating file information.");
+    emit debugInfo(ipAddress + ": finished updating file information.");
+    emit copyFinished(ipAddress, 0);
     disconnectFromNetworkShare(ipAddress, share);
-    emit copyFinished(ipAddress, share);
 }
 
 void FileOperations::disconnectFromNetworkShare(const QString& ipAddress, const QString& share) {
@@ -234,8 +282,9 @@ void FileOperations::disconnectFromNetworkShare(const QString& ipAddress, const 
     int result = QProcess::execute(disconnectCommand);
     if (result == 0) {
         qDebug() << "Disconnected from server successfully.";
-        emit debugInfo("Disconnected from server successfully.");
+        emit debugInfo(ipAddress + ": disconnected from server successfully.");
     } else {
         qDebug() << "Failed to disconnect from server";
+        emit debugInfo(ipAddress + ": failed to disconnect from server.");
     }
 }

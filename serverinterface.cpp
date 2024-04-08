@@ -16,6 +16,7 @@
 #include <QTcpSocket>
 #include <QTimer>
 #include "serverinterface.h"
+#include "progressdialog.h"
 #include "ui_serverinterface.h"
 
 ServerInterface::ServerInterface(QWidget *parent) :
@@ -28,6 +29,7 @@ ServerInterface::ServerInterface(QWidget *parent) :
     spawnMenu();
     ui->searchLine->installEventFilter(this);
 
+
     model = qobject_cast<ObjectsTable*>(ui->tableView->model());
     if (model) {
         currentQuery = model->getQuery(); // Используем метод getQuery() из класса ObjectsTable
@@ -35,17 +37,19 @@ ServerInterface::ServerInterface(QWidget *parent) :
         qDebug() << "Модель данных не найдена!";
     }
 
-    // Устанавливаем количество столбцов в errorTreeWidget
-    ui->errorTreeWidget->setColumnCount(2);
+}
 
-    // Устанавливаем заголовки столбцов
-    ui->errorTreeWidget->setHeaderLabels({"Тип ошибки", "Текст ошибки"});
-
+void ServerInterface::openProgressWindow() {
+    ProgressDialog *progress = new ProgressDialog(this); // установка текущего объекта в качестве родителя
+    connect(this, &ServerInterface::sendDebugInfoInProgress, progress, &ProgressDialog::updateDebugInfo);
+    connect(this, &ServerInterface::sendListSize, progress, &ProgressDialog::receiveListSize);
+    connect(this, &ServerInterface::sendUpdateProgressBar, progress, &ProgressDialog::receiveUpdateProgressBar);
+    progress->setAttribute(Qt::WA_DeleteOnClose); // для автоматического удаления окна после закрытия
+    progress->show();
 }
 
 void ServerInterface::receiveDebugInfo(const QString& info) {
-    // Вывод дебаг-информации в QTextBrowser
-    ui->debug->append(info);
+    emit sendDebugInfoInProgress(info);
 }
 
 void ServerInterface::receiveData(const QString& newLogin, const QString& newPassword, const bool newFlag, const QString source) {
@@ -56,34 +60,37 @@ void ServerInterface::receiveData(const QString& newLogin, const QString& newPas
 
 void ServerInterface::on_serverUpdateButton_clicked()
 {
-    QList<QString> ipList = model->getSelectedIPs();
-    Confirmation dialog(this, ipList);
+    QMap<QString, QString> ipMap = model->getSelectedIPs();
+    Confirmation dialog(this, ipMap);
     dialog.exec();
 }
 
 void ServerInterface::updateServerFiles(const bool closeFlag, const QString& login, const QString& password, const QString source) {
 
-    QList<QString> ipList = model->getSelectedIPs();
+    QMap<QString, QString> ipMap = model->getSelectedIPs();
+    emit sendListSize(ipMap.size());
 
     QList<QFuture<void>> futures;
-    for (const auto& IPAddress : ipList) {
+    for (auto it = ipMap.begin(); it != ipMap.end(); ++it) {
+        QString IPAddress = it.key();
+
         futures.append(QtConcurrent::run([=]() {
             FileOperations server = new FileOperations();
 
             connect(&server, &FileOperations::debugInfo, this, &ServerInterface::receiveDebugInfo);
-
-            server.connectToNetworkShare(IPAddress, "d$", login, password, closeFlag, source);
-
             connect(&server, &FileOperations::copyFinished, this, &ServerInterface::handleCopyFinished);
-
+            server.connectToNetworkShare(IPAddress, "d$", login, password, closeFlag, source);
         }));
     }
 }
 
-void ServerInterface::handleCopyFinished(const QString &ipAddress, const QString &share) {
+
+void ServerInterface::handleCopyFinished(const QString &ipAddress, const int &finishCode) {
+    emit sendUpdateProgressBar();
     // Выполните здесь необходимые действия после завершения копирования файлов, например, отключение от сетевой шары
-    qDebug() << "Copying files finished for IP:" << ipAddress << "and share:" << share;
+    qDebug() << "Copying files finished for IP:" << ipAddress << "and code:" << finishCode;
     // ...
+    model->updateRowColor(ipAddress, finishCode);
 }
 
 void ServerInterface::on_markSetManual_stateChanged(int arg1)
@@ -231,11 +238,11 @@ void ServerInterface::spawnMenu() {
     filterMenu->addAction(switchWidgetAction);
 
     // Добавляем фильтр для городов
-    QLabel *titleLabel1 = new QLabel("Города:", this);
+    QLabel *titleLabel1 = new QLabel("Градове:", this);
     titleLabel1->setEnabled(false);
     QWidgetAction *titleWidgetAction1 = new QWidgetAction(this);
     titleWidgetAction1->setDefaultWidget(titleLabel1);
-    titleLabel1->setStyleSheet("QLabel { font-weight: 600; padding-right: 141px; margin: 0 7px; background-color: white;}");
+    titleLabel1->setStyleSheet("QLabel { font-weight: 600; padding-right: 133px; margin: 0 7px; background-color: white;}");
     filterMenu->addAction(titleWidgetAction1);
 
     // Добавляем разделитель
@@ -256,28 +263,28 @@ void ServerInterface::spawnMenu() {
     titleLabel2->setEnabled(false);
     QWidgetAction *titleWidgetAction2 = new QWidgetAction(this);
     titleWidgetAction2->setDefaultWidget(titleLabel2);
-    titleLabel2->setStyleSheet("QLabel { font-weight: 600; padding-right: 141px; margin: 0 7px; background-color: white;}");
+    titleLabel2->setStyleSheet("QLabel { font-weight: 600; padding-right: 100px; margin: 0 7px; background-color: white;}");
     filterMenu->addAction(titleWidgetAction2);
 
     // Добавляем разделитель
     filterMenu->addSeparator();
 
     // Создаем фильтры для статуса и добавляем их в меню
-    QAction *filterStatusAction1 = new QAction("Доступные", this);
-    QAction *filterStatusAction2 = new QAction("Обновлённые", this);
-    QAction *filterStatusAction3 = new QAction("Архивированные", this);
-    QAction *filterStatusAction4 = new QAction("Ошибки", this);
+    QAction *filterStatusAction1 = new QAction("Достъпни", this);
+    QAction *filterStatusAction2 = new QAction("Актуализирани", this);
+    QAction *filterStatusAction3 = new QAction("Архивирани", this);
+    QAction *filterStatusAction4 = new QAction("Грешки", this);
     filterMenu->addAction(filterStatusAction1);
     filterMenu->addAction(filterStatusAction2);
     filterMenu->addAction(filterStatusAction3);
     filterMenu->addAction(filterStatusAction4);
 
     // Добавляем фильтр для тэгов
-    QLabel *titleLabel3 = new QLabel("Тэги:", this);
+    QLabel *titleLabel3 = new QLabel("Тагове:", this);
     titleLabel3->setEnabled(false);
     QWidgetAction *titleWidgetAction3 = new QWidgetAction(this);
     titleWidgetAction3->setDefaultWidget(titleLabel3);
-    titleLabel3->setStyleSheet("QLabel { font-weight: 600; padding-right: 141px; margin: 0 7px; background-color: white;}");
+    titleLabel3->setStyleSheet("QLabel { font-weight: 600; padding-right: 100px; margin: 0 7px; background-color: white;}");
     filterMenu->addAction(titleWidgetAction3);
 
     // Добавляем разделитель
@@ -287,8 +294,8 @@ void ServerInterface::spawnMenu() {
     QAction *filterTagAction1 = new QAction("Клик", this);
     QAction *filterTagAction2 = new QAction("Пункт", this);
     QAction *filterTagAction3 = new QAction("Аптека", this);
-    QAction *filterTagAction4 = new QAction("Новый", this);
-    QAction *filterTagAction5 = new QAction("Закрытый", this);
+    QAction *filterTagAction4 = new QAction("Нов", this);
+    QAction *filterTagAction5 = new QAction("Затворен", this);
     filterMenu->addAction(filterTagAction1);
     filterMenu->addAction(filterTagAction2);
     filterMenu->addAction(filterTagAction3);
@@ -325,19 +332,19 @@ void ServerInterface::spawnMenu() {
     });
 
     connect(filterStatusAction1, &QAction::triggered, [=]() {
-        applyStatusFilter("Доступные");
+        applyStatusFilter("Достъпни");
     });
 
     connect(filterStatusAction2, &QAction::triggered, [=]() {
-        applyStatusFilter("Обновлённые");
+        applyStatusFilter("Актуализирани");
     });
 
     connect(filterStatusAction3, &QAction::triggered, [=]() {
-        applyStatusFilter("Архивированные");
+        applyStatusFilter("Архивирани");
     });
 
     connect(filterStatusAction4, &QAction::triggered, [=]() {
-        applyStatusFilter("Ошибки");
+        applyStatusFilter("Грешки");
     });
 
     connect(filterTagAction1, &QAction::triggered, [=]() {
@@ -353,11 +360,11 @@ void ServerInterface::spawnMenu() {
     });
 
     connect(filterTagAction4, &QAction::triggered, [=]() {
-        applyTagFilter("Новый");
+        applyTagFilter("Нов");
     });
 
     connect(filterTagAction5, &QAction::triggered, [=]() {
-        applyTagFilter("Закрытый");
+        applyTagFilter("Затворен");
     });
 }
 
@@ -461,18 +468,18 @@ void ServerInterface::applyCityFilter(const QString &city) {
 void ServerInterface::applyStatusFilter(const QString &status) {
     QString filterValue;
     QString displayText;
-    if (status == "Доступные") {
+    if (status == "Достъпни") {
         filterValue = "";
-        displayText = "Доступные";
-    } else if (status == "Обновлённые") {
+        displayText = "Достъпни";
+    } else if (status == "Актуализирани") {
         filterValue = "yes";
-        displayText = "Обновлённые";
-    } else if (status == "Архивированные") {
+        displayText = "Актуализирани";
+    } else if (status == "Архивирани") {
         filterValue = "yes";
-        displayText = "Архивированные";
-    } else if (status == "Ошибки") {
+        displayText = "Архивирани";
+    } else if (status == "Грешки") {
         filterValue = "lg";
-        displayText = "Ошибки";
+        displayText = "Грешки";
     }
     applyFilter("a1", filterValue, displayText, false);
 }
@@ -492,13 +499,13 @@ void ServerInterface::applyTagFilter(const QString &tag) {
         filterValue = "%a%";
         displayText = "Аптека";
         applyFilter("Nkod", filterValue, displayText, true);
-    } else if (tag == "Новый") {
+    } else if (tag == "Нов") {
         filterValue = "%n%";
-        displayText = "Новый";
+        displayText = "Нов";
         applyFilter("mode", filterValue, displayText, true);
-    } else if (tag == "Закрытый") {
+    } else if (tag == "Затворен") {
         filterValue = "%s%";
-        displayText = "Закрытый";
+        displayText = "Затворен";
         applyFilter("mode", filterValue, displayText, true);
     }
 }

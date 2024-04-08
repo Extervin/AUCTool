@@ -73,12 +73,40 @@ int ObjectsTable::columnCount(const QModelIndex &parent) const
     return m_queryModel->columnCount(parent); // Добавляем одну дополнительную колонку
 }
 
+void ObjectsTable::updateRowColor(const QString &ipAddress, int resultCode) {
+    // Сохраняем айпи адрес и код завершения обновления
+    m_lastUpdatedIpAddress = ipAddress;
+    m_lastUpdateResult = resultCode;
+
+    // Ищем индекс строки по IP-адресу
+    for (int row = 0; row < rowCount(); ++row) {
+        QModelIndex ipIndex = index(row, 2);
+        if (data(ipIndex, Qt::DisplayRole).toString() == ipAddress) {
+            // Если нашли соответствующий IP-адрес, сохраняем цвет строки
+            m_rowColors[row] = getRowColor(resultCode); // Получаем цвет строки в зависимости от результата обновления
+            // Оповещаем вид о необходимости обновить отображение данных
+            QModelIndex topLeft = index(row, 0);
+            QModelIndex bottomRight = index(row, columnCount() - 1);
+            emit dataChanged(topLeft, bottomRight);
+            return; // Завершаем поиск, когда нашли нужный IP-адрес
+        }
+    }
+}
+
+
 QVariant ObjectsTable::data(const QModelIndex &index, int role) const
 {
     if (!index.isValid())
         return QVariant();
 
-    if (role == Qt::DisplayRole) {
+    int row = index.row();
+
+    if (role == Qt::BackgroundRole) {
+        // Проверяем, есть ли сохраненный цвет для этой строки
+        if (m_rowColors.contains(row)) {
+            return m_rowColors[row]; // Возвращаем сохраненный цвет
+        }
+    } else if (role == Qt::DisplayRole) {
         return m_queryModel->data(this->index(index.row(), index.column()));
     } else if (role == Qt::DecorationRole && index.column() == 0) {
         // Если роль - декорация и это первая колонка
@@ -167,18 +195,45 @@ bool ObjectsTable::setData(const QModelIndex &index, const QVariant &value, int 
     return false;
 }
 
-QList<QString> ObjectsTable::getSelectedIPs() const {
-    QList<QString> selectedIPs;
+QColor ObjectsTable::getRowColor(int resultCode) {
+    QColor color;
+
+    // Определение цвета в зависимости от кода результата
+    switch(resultCode) {
+    case 0:
+        // Успешное обновление, зеленый цвет
+        color = QColor(76, 175, 80); // Зеленый цвет
+        break;
+    case 1:
+        // Ошибка при обновлении, красный цвет
+        color = QColor(221, 0, 0); // Красный цвет
+        break;
+    case 2:
+        // Частично успешное обновление, желтый цвет
+        color = QColor(255, 255, 0); // Желтый цвет
+        break;
+    default:
+        // По умолчанию, белый цвет
+        color = QColor(255, 255, 255); // Белый цвет
+        break;
+    }
+
+    return color;
+}
+
+QMap<QString, QString> ObjectsTable::getSelectedIPs() const {
+    QMap<QString, QString> selectedIPsAndNamesMap;
     for (int row = 0; row < rowCount(); ++row) {
         QModelIndex index = this->index(row, 0); // Первая колонка с чекбоксами
         if (data(index, Qt::CheckStateRole) == Qt::Checked) {
-            // Если чекбокс отмечен, добавляем айпи в список выбранных
+            // Если чекбокс отмечен, добавляем IP-адрес и имя объекта в карту выбранных
             QModelIndex ipIndex = this->index(row, 2); // Индекс колонки с айпи
             QString ipAddress = data(ipIndex, Qt::DisplayRole).toString();
-            selectedIPs.append(ipAddress);
+            QModelIndex nameIndex = this->index(row, 0); // Индекс колонки с именем объекта
+            QString objectName = data(nameIndex, Qt::DisplayRole).toString();
+            selectedIPsAndNamesMap[ipAddress] = objectName;
         }
     }
-    return selectedIPs;
+    return selectedIPsAndNamesMap;
 }
-
 

@@ -27,12 +27,16 @@ public:
     QVariant headerData(int section, Qt::Orientation orientation, int role = Qt::DisplayRole) const override;
     Qt::ItemFlags flags(const QModelIndex &index) const override;
     bool setData(const QModelIndex &index, const QVariant &value, int role = Qt::EditRole) override;
-    QList<QString> getSelectedIPs() const;
+    QMap<QString, QString> getSelectedIPs() const;
+
+    void updateRowColor(const QString &ipAddress, int finishCode);
+    QColor getRowColor(int resultCode);
 
     // Функция для установки SQL-запроса
     QString getQuery() const;
     void setQuery(const QString &query);
     void addIPAddress(const QString &ipAddress);
+
 
     QMap<QString, bool> m_pingFlags;
     QMap<QString, QColor> m_pingColors;
@@ -40,8 +44,11 @@ public:
 private:
     QSqlQueryModel *m_queryModel;
     QString m_currentQuery;
+    QString m_lastUpdatedIpAddress;
+    int m_lastUpdateResult;
     QMap<int, Qt::CheckState> m_checkStates; // Переменная для хранения состояний чекбоксов
     bool m_markSetManualState = false;
+    QMap<int, QColor> m_rowColors;
 
 };
 

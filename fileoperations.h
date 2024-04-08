@@ -7,7 +7,7 @@ class FileOperations : public QObject {
     Q_OBJECT
 
 signals:
-    void copyFinished(const QString &ipAddress, const QString &share);
+    void copyFinished(const QString &ipAddress, const int &finishCode);
 
     void debugInfo(const QString& info);
 

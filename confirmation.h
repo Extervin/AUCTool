@@ -2,6 +2,7 @@
 #define CONFIRMATION_H
 
 #include <QDialog>
+#include <QMap>
 
 namespace Ui {
 class Confirmation;
@@ -12,13 +13,17 @@ class Confirmation : public QDialog
     Q_OBJECT
 signals:
     void sendData(const QString& newLogin, const QString &newPassword, const bool newFlag, const QString source);
+
+    void openProgress();
+
 public:
-    explicit Confirmation(QWidget *parent = nullptr, QList<QString> ipList = QStringList());
+    explicit Confirmation(QWidget *parent = nullptr, const QMap<QString, QString>& ipMap = QMap<QString, QString>());
     ~Confirmation();
+
 
 private slots:
 
-    void ipListWidgetSpawn(QList<QString> ipList);
+    void ipListWidgetSpawn(const QMap<QString, QString>& ipMap);
 
     void on_confirmButton_clicked();
 
@@ -26,19 +31,22 @@ private slots:
 
     void on_declineButton_clicked();
 
+    void on_sourcePath_textChanged(const QString &arg1);
+
 private:
 
     void updateFileListWidget();
+
+    bool canConnectToShare(const QString& ipAddress, const QString& username, const QString& password);
 
     Ui::Confirmation *ui;
 
     QString login = "";
     QString password = "";
     bool closeDrugFlag = false;
-    QStringList fileList;
 
     QList<QString> *ipListPtr;
-    QList<QString> ipList;
+    QMap<QString, QString> ipMap;
     QString source;
 };
 

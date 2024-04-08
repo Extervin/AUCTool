@@ -23,18 +23,15 @@
    </size>
   </property>
   <property name="windowTitle">
-   <string>MainWindow</string>
+   <string>AUC Tool v3.0e</string>
   </property>
   <property name="styleSheet">
-   <string notr="true">
-/* Центральный виджет (centralwidget) */
-        QWidget#centralwidget {
+   <string notr="true">		QWidget#centralwidget {
             border: 2px solid #cccccc; /* Рамка */
             border-radius: 10px; /* Закругление углов */
 			margin: 5px;
         }
 
-        /* Виджеты внутри главного окна (QWidget) */
         QWidget {
             background-color: #FAF9F9;
         }
@@ -43,13 +40,11 @@
 			border: 1px solid #cccccc; /* Рамка */
 		}
 
-        /* Панель меню (menubar) */
         QMenuBar#menubar {
             background-color: #FAF9F9; /* Цвет фона */
             padding: 5px 10px; /* Отступы */
         }
 
-        /* Заголовки вкладок (QTabBar::tab) */
         QTabBar::tab {
             background-color: #f0f0f0; /* Цвет фона */
             color: #333333; /* Цвет текста */
@@ -61,7 +56,7 @@
 		/* Отступ справа для QTabWidget */
 
 #tabWidget {
- margin: 10px; /* Сокращаем размер виджета вкладок на 10px справа */
+ margin: 10px;
 }
         /* Выбранная вкладка (QTabBar::tab:selected) */
         QTabBar::tab:selected {
@@ -96,22 +91,6 @@ QComboBox::drop-down {
 	background-color: yellow;
 	background-image: url(qrc:/arrow.png);
 }
-
-        /* Кнопка (QPushButton) */
-        QPushButton {
-            padding: 8px 16px; /* Отступы */
-            background-color: #007bff; /* Цвет фона */
-            color: #ffffff; /* Цвет текста */
-            border: none; /* Убираем границы */
-            border-radius: 5px; /* Закругление углов */
-            font-size: 14px; /* Размер шрифта */
-        }
-
-        /* Наведение на кнопку (QPushButton:hover) */
-        QPushButton:hover {
-            background-color: #0056b3; /* Цвет фона при наведении */
-        }
-
         /* Чекбокс (QCheckBox) */
         QCheckBox {
             spacing: 5px; /* Расстояние между флажком и текстом */
@@ -144,20 +123,6 @@ QComboBox::drop-down {
             font-size: 14px; /* Размер шрифта */
             color: #333333; /* Цвет текста */
 		}
-        /* Кнопка инструментов (QToolButton) */
-        QToolButton {
-            padding: 8px 16px; /* Отступы */
-            background-color: #007bff; /* Цвет фона */
-            color: #ffffff; /* Цвет текста */
-            border: none; /* Убираем границы */
-            border-radius: 5px; /* Закругление углов */
-            font-size: 14px; /* Размер шрифта */
-        }
-
-        /* Наведение на кнопку инструментов (QToolButton:hover) */
-        QToolButton:hover {
-            background-color: #0056b3; /* Цвет фона при наведении */
-        }
 </string>
   </property>
   <widget class="QWidget" name="centralwidget">
@@ -166,6 +131,30 @@ QComboBox::drop-down {
      <horstretch>0</horstretch>
      <verstretch>0</verstretch>
     </sizepolicy>
+   </property>
+   <property name="styleSheet">
+    <string notr="true">        QPushButton {
+            padding: 8px 16px; /* Отступы */
+            background-color: #007bff; /* Цвет фона */
+            color: #ffffff; /* Цвет текста */
+            border: none; /* Убираем границы */
+            border-radius: 5px; /* Закругление углов */
+            font-size: 14px; /* Размер шрифта */
+        }
+        QPushButton:hover {
+            background-color: #0056b3; /* Цвет фона при наведении */
+        }
+	QToolButton {
+            padding: 8px 16px; /* Отступы */
+            background-color: #007bff; /* Цвет фона */
+            color: #ffffff; /* Цвет текста */
+            border: none; /* Убираем границы */
+            border-radius: 5px; /* Закругление углов */
+            font-size: 14px; /* Размер шрифта */
+        }
+        QToolButton:hover {
+            background-color: #0056b3; /* Цвет фона при наведении */
+        }</string>
    </property>
    <layout class="QGridLayout" name="gridLayout_3">
     <item row="0" column="1">
@@ -179,7 +168,7 @@ QComboBox::drop-down {
       <property name="maximumSize">
        <size>
         <width>16777215</width>
-        <height>16777215</height>
+        <height>54</height>
        </size>
       </property>
       <property name="layoutDirection">
@@ -247,7 +236,7 @@ QComboBox::drop-down {
          <property name="maximumSize">
           <size>
            <width>170</width>
-           <height>16777215</height>
+           <height>36</height>
           </size>
          </property>
          <property name="layoutDirection">
@@ -327,12 +316,19 @@ QComboBox::drop-down {
        </item>
        <item alignment="Qt::AlignLeft">
         <widget class="QWidget" name="appliedFilters" native="true">
+         <property name="maximumSize">
+          <size>
+           <width>16777215</width>
+           <height>36</height>
+          </size>
+         </property>
          <property name="styleSheet">
           <string notr="true">#appliedFilters &gt; * {
     border: 2px solid #959595;
     border-radius: 10px;
     padding: 0 10px;
     background-color: #ffffff;
+	max-height: 36px;
 }
 #appliedFilters QWidget QPushButton {
 	margin: 0;
@@ -383,7 +379,19 @@ QComboBox::drop-down {
       <property name="sizeAdjustPolicy">
        <enum>QAbstractScrollArea::AdjustToContents</enum>
       </property>
+      <property name="alternatingRowColors">
+       <bool>false</bool>
+      </property>
+      <property name="selectionMode">
+       <enum>QAbstractItemView::ExtendedSelection</enum>
+      </property>
+      <property name="selectionBehavior">
+       <enum>QAbstractItemView::SelectRows</enum>
+      </property>
       <property name="sortingEnabled">
+       <bool>false</bool>
+      </property>
+      <property name="cornerButtonEnabled">
        <bool>false</bool>
       </property>
       <attribute name="horizontalHeaderStretchLastSection">
@@ -432,9 +440,9 @@ QComboBox::drop-down {
         </widget>
        </item>
        <item>
-        <widget class="QPushButton" name="serverClearButton">
+        <widget class="QPushButton" name="testButton">
          <property name="text">
-          <string>Clear</string>
+          <string>TEST</string>
          </property>
         </widget>
        </item>
@@ -525,7 +533,34 @@ li.checked::marker { content: &quot;\2612&quot;; }
      </widget>
     </item>
     <item row="3" column="2" rowspan="2">
-     <widget class="QTreeWidget" name="errorTreeWidget"/>
+     <widget class="QTreeWidget" name="errorTreeWidget">
+      <column>
+       <property name="text">
+        <string notr="true">Обект</string>
+       </property>
+      </column>
+      <column>
+       <property name="text">
+        <string>IP</string>
+       </property>
+      </column>
+      <item>
+       <property name="text">
+        <string>Test</string>
+       </property>
+       <property name="text">
+        <string>10.10.11.199</string>
+       </property>
+       <item>
+        <property name="text">
+         <string>Грешка</string>
+        </property>
+        <property name="text">
+         <string>Can't copy file N to directory &quot;1&quot;</string>
+        </property>
+       </item>
+      </item>
+     </widget>
     </item>
    </layout>
   </widget>

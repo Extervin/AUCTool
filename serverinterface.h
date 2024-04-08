@@ -20,14 +20,22 @@ public:
     explicit ServerInterface(QWidget *parent = nullptr);
     ~ServerInterface();
 public slots:
-    void handleCopyFinished(const QString &ipAddress, const QString &share);
+    void handleCopyFinished(const QString &ipAddress, const int &finishCode);
 
     void receiveData(const QString& newLogin, const QString &newPassword, const bool newFlag, const QString source);
 
     void receiveDebugInfo(const QString& info);
 
+    void openProgressWindow();
+
 signals:
     void pingResult(const QString& ipAddress, bool pingSuccess);
+
+    void sendDebugInfoInProgress(const QString& info);
+
+    void sendUpdateProgressBar();
+
+    void sendListSize(const int& listSize);
 
 private slots:
     void onSwitchToggled(bool checked);
