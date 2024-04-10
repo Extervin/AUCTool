@@ -11,6 +11,8 @@ signals:
 
     void debugInfo(const QString& info);
 
+    void recieveError(const QString& ipAddress, const QString& errorType, const QString& errorMessage);
+
 public:
     FileOperations(QObject *parent = nullptr);
 
@@ -20,10 +22,10 @@ public:
     void disconnectFromNetworkShare(const QString &ipAddress, const QString &share);
 
 private:
-    void copyTempToAllSubdirectories(const QString &tempDirPath, const QString &targetDirPath, const QString &ipAddress, const QString &share);
+    void copyTempToAllSubdirectories(const QString &sourceDirPath, const QString &tempDirPath, const QString &targetDirPath, const QString &ipAddress, const QString &share, bool noncriticalError);
     void copyFilesToTemp(const QString &sourceDirPath, const QString &tempDirPath, const QString &ipAddress, const QString &share);
-    void removeTempDirectory(QString tempDirPath, const QString &ipAddress, const QString &share);
-    void updateVersionFile(const QString &sourceDirPath, const QString &targetDirPath, const QString &ipAddress, const QString &share);
+    void removeTempDirectory(const QString &sourceDirPath, QString tempDirPath, const QString &ipAddress, const QString &share, bool noncriticalError);
+    void updateVersionFile(const QString &sourceDirPath, const QString &targetDirPath, const QString &ipAddress, const QString &share, bool noncriticalError);
     void closeDrugProcess(const QString& ipAddress, const QString& share, const QString& username, const QString& password);
 
 };

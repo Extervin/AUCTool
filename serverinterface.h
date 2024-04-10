@@ -28,6 +28,8 @@ public slots:
 
     void openProgressWindow();
 
+    void recieveError(const QString& ipAddress, const QString& errorType, const QString& errorMessage);
+
 signals:
     void pingResult(const QString& ipAddress, bool pingSuccess);
 
@@ -77,6 +79,7 @@ private:
     QString password = "";
     bool closeDrugFlag = false;
     QList<QString> fileList;
+    bool filterInclude = true;
 };
 
 #endif // SERVERINTERFACE_H

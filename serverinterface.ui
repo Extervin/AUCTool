@@ -316,18 +316,30 @@ QComboBox::drop-down {
        </item>
        <item alignment="Qt::AlignLeft">
         <widget class="QWidget" name="appliedFilters" native="true">
+         <property name="minimumSize">
+          <size>
+           <width>0</width>
+           <height>0</height>
+          </size>
+         </property>
          <property name="maximumSize">
           <size>
            <width>16777215</width>
            <height>36</height>
           </size>
          </property>
+         <property name="focusPolicy">
+          <enum>Qt::NoFocus</enum>
+         </property>
+         <property name="layoutDirection">
+          <enum>Qt::LeftToRight</enum>
+         </property>
          <property name="styleSheet">
           <string notr="true">#appliedFilters &gt; * {
-    border: 2px solid #959595;
+    border: 2px solid #00ab41;
     border-radius: 10px;
     padding: 0 10px;
-    background-color: #ffffff;
+    background-color: #EFFFEF;
 	max-height: 36px;
 }
 #appliedFilters QWidget QPushButton {
@@ -336,12 +348,12 @@ QComboBox::drop-down {
 	background-color: transparent;
 }
 #appliedFilters QWidget QPushButton::hover {
-	background-color: rgba(55, 55, 55, 50);
+	background-color: #D1FFD1;
 	border-radius: 10px;
-	border: 2px solid #888888;
+	border: 2px solid #00ab41;
 }
 #appliedFilters QWidget QLabel {
-	color: #666666;
+	color: #008631;
 	padding: 0px;
 	margin: 0px;
 	font-weight: 700;
@@ -410,6 +422,12 @@ QComboBox::drop-down {
         <verstretch>8</verstretch>
        </sizepolicy>
       </property>
+      <property name="maximumSize">
+       <size>
+        <width>16777215</width>
+        <height>60</height>
+       </size>
+      </property>
       <layout class="QHBoxLayout" name="horizontalLayout">
        <item>
         <widget class="QCheckBox" name="markSetManual">
@@ -419,11 +437,20 @@ QComboBox::drop-down {
         </widget>
        </item>
        <item>
-        <widget class="QCheckBox" name="markCloseDrug">
-         <property name="text">
-          <string>Close DRUG.EXE</string>
+        <spacer name="horizontalSpacer">
+         <property name="orientation">
+          <enum>Qt::Horizontal</enum>
          </property>
-        </widget>
+         <property name="sizeType">
+          <enum>QSizePolicy::Maximum</enum>
+         </property>
+         <property name="sizeHint" stdset="0">
+          <size>
+           <width>500</width>
+           <height>20</height>
+          </size>
+         </property>
+        </spacer>
        </item>
        <item>
         <widget class="QPushButton" name="serverUpdateButton">
@@ -432,25 +459,14 @@ QComboBox::drop-down {
          </property>
         </widget>
        </item>
-       <item>
-        <widget class="QPushButton" name="serverArchiveButton">
-         <property name="text">
-          <string>Archive</string>
-         </property>
-        </widget>
-       </item>
-       <item>
-        <widget class="QPushButton" name="testButton">
-         <property name="text">
-          <string>TEST</string>
-         </property>
-        </widget>
-       </item>
       </layout>
      </widget>
     </item>
     <item row="0" column="2" rowspan="3">
      <widget class="QTabWidget" name="tabWidget">
+      <property name="enabled">
+       <bool>false</bool>
+      </property>
       <property name="sizePolicy">
        <sizepolicy hsizetype="Expanding" vsizetype="Preferred">
         <horstretch>1</horstretch>
@@ -544,22 +560,6 @@ li.checked::marker { content: &quot;\2612&quot;; }
         <string>IP</string>
        </property>
       </column>
-      <item>
-       <property name="text">
-        <string>Test</string>
-       </property>
-       <property name="text">
-        <string>10.10.11.199</string>
-       </property>
-       <item>
-        <property name="text">
-         <string>Грешка</string>
-        </property>
-        <property name="text">
-         <string>Can't copy file N to directory &quot;1&quot;</string>
-        </property>
-       </item>
-      </item>
      </widget>
     </item>
    </layout>

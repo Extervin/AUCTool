@@ -124,13 +124,12 @@ void Confirmation::on_openButton_clicked()
 }
 
 void Confirmation::updateFileListWidget() {
-    ui->sourcePath->clear();
     ui->sourcePath->setText(source);
 }
 
 void Confirmation::on_declineButton_clicked()
 {
-
+    close();
 }
 
 

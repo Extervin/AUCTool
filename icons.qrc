@@ -3,5 +3,7 @@
         <file>icon/filter.svg</file>
         <file>icon/search.svg</file>
         <file>icon/x-666666-color.svg</file>
+        <file>icon/x-008631-color.svg</file>
+        <file>icon/x-BD2C36-color.svg</file>
     </qresource>
 </RCC>

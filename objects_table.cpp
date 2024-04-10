@@ -224,16 +224,18 @@ QColor ObjectsTable::getRowColor(int resultCode) {
 QMap<QString, QString> ObjectsTable::getSelectedIPs() const {
     QMap<QString, QString> selectedIPsAndNamesMap;
     for (int row = 0; row < rowCount(); ++row) {
-        QModelIndex index = this->index(row, 0); // Первая колонка с чекбоксами
-        if (data(index, Qt::CheckStateRole) == Qt::Checked) {
-            // Если чекбокс отмечен, добавляем IP-адрес и имя объекта в карту выбранных
-            QModelIndex ipIndex = this->index(row, 2); // Индекс колонки с айпи
-            QString ipAddress = data(ipIndex, Qt::DisplayRole).toString();
-            QModelIndex nameIndex = this->index(row, 0); // Индекс колонки с именем объекта
-            QString objectName = data(nameIndex, Qt::DisplayRole).toString();
+        QModelIndex ipIndex = this->index(row, 2); // Индекс колонки с айпи
+        QString ipAddress = data(ipIndex, Qt::DisplayRole).toString();
+        QModelIndex nameIndex = this->index(row, 0); // Индекс колонки с именем объекта
+        QString objectName = data(nameIndex, Qt::DisplayRole).toString();
+
+        // Если флаг установлен в false или чекбокс отмечен, добавляем IP-адрес и имя объекта в карту выбранных
+        if (!m_markSetManualState || data(index(row, 0), Qt::CheckStateRole) == Qt::Checked) {
             selectedIPsAndNamesMap[ipAddress] = objectName;
         }
     }
     return selectedIPsAndNamesMap;
 }
+
+
 

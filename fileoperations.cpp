@@ -12,7 +12,6 @@ FileOperations::FileOperations(QObject *parent) : QObject(parent) {
 void FileOperations::connectToNetworkShare(const QString& ipAddress, const QString& share, const QString& username, const QString& password, const bool closeFlag, const QString source) {
     // Проверяем состояние подключения к сетевому ресурсу
     QString checkConnectionCommand = QString("net use \\\\%1\\%2").arg(ipAddress, share);
-
     QProcess checkProcess;
     checkProcess.start(checkConnectionCommand);
     checkProcess.waitForFinished(-1); // Ждем завершения выполнения процесса
@@ -54,7 +53,7 @@ void FileOperations::connectToNetworkShare(const QString& ipAddress, const QStri
         } else {
             qDebug() << "Failed to connect to " + ipAddress + ".";
             emit debugInfo(ipAddress + ": failed to connect.");
-            // Обработка ошибки подключения к сетевой шаре
+            emit recieveError(ipAddress, "Connection error", "Can't connect to the server");
             emit copyFinished(ipAddress, 1);
         }
     }
@@ -68,17 +67,32 @@ void FileOperations::closeDrugProcess(const QString& ipAddress, const QString& s
     QProcess process;
     process.start("cmd.exe", QStringList() << "/C" << command);
     process.waitForFinished(-1);
-    emit debugInfo(ipAddress + ": closed drug.exe.");
+
+    QString resultMessage;
+
+    if (process.exitCode() == 0) {
+        resultMessage = ipAddress + ": drug.exe process closed successfully.";
+    } else if (process.exitCode() == 128) {
+        resultMessage = ipAddress + ": drug.exe process not found.";
+    } else {
+        resultMessage = ipAddress + ": drug.exe process can't be closed.";
+        emit recieveError(ipAddress, "drug.exe error", "Can't close drug.exe");
+    }
+
+    emit debugInfo(resultMessage);
 }
+
 
 void FileOperations::copyFilesToTemp(const QString &sourceDirPath, const QString &targetDirPath, const QString& ipAddress, const QString& share) {
     QString tempDirPath = targetDirPath + "\\temp";
     QDir sourceDir(sourceDirPath);
     QDir tempDir(tempDirPath);
+    bool noncriticalError = false;
 
     if (!sourceDir.exists()) {
         qDebug() << "Source directory does not exist: " << sourceDirPath;
         emit debugInfo(ipAddress + ": source directory does not exist.");
+        emit recieveError(ipAddress, "Source error", "Can't find source directory");
         emit copyFinished(ipAddress, 1);
         disconnectFromNetworkShare(ipAddress, share);
         return;
@@ -89,6 +103,7 @@ void FileOperations::copyFilesToTemp(const QString &sourceDirPath, const QString
         if (!tempDir.removeRecursively()) {
             qDebug() << "Failed to remove existing temp directory: " << tempDirPath;
             emit debugInfo(ipAddress + ": failed to remove existing temp directory.");
+            emit recieveError(ipAddress, "Temp error", "Can't remove temp directory");
             emit copyFinished(ipAddress, 1);
             disconnectFromNetworkShare(ipAddress, share);
             return;
@@ -99,6 +114,7 @@ void FileOperations::copyFilesToTemp(const QString &sourceDirPath, const QString
     if (!tempDir.mkpath(".")) {
         qDebug() << "Failed to create temp directory: " << tempDirPath;
         emit debugInfo(ipAddress + ": failed to create temp directory.");
+        emit recieveError(ipAddress, "Temp error", "Can't create temp directory");
         emit copyFinished(ipAddress, 1);
         disconnectFromNetworkShare(ipAddress, share);
         return;
@@ -114,31 +130,37 @@ void FileOperations::copyFilesToTemp(const QString &sourceDirPath, const QString
         if (!QFile::copy(sourceFilePath, destinationFilePath)) {
             qDebug() << "Failed to copy file: " << sourceFilePath << " to " << destinationFilePath;
             emit debugInfo(ipAddress + ": failed to copy file " + sourceFilePath + " to " + destinationFilePath);
+            QFileInfo fileInfo(sourceFilePath);
+            QString fileName = fileInfo.fileName();
+            emit recieveError(ipAddress, "Copy error", "Can't copy file " + fileName + " to temp."); // ДОПОЛНИТЬ НАЗВАНИЯМИ ФАЙЛОВ
             emit copyFinished(ipAddress, 2);
+            noncriticalError = true;
             continue;
         }
 
         qDebug() << "Copied file: " << sourceFilePath << " to " << destinationFilePath;
         emit debugInfo(ipAddress + ": copied file " + sourceFilePath + " to " + destinationFilePath + " successfully.");
     }
-    copyTempToAllSubdirectories(tempDirPath, targetDirPath, ipAddress, share);
+    copyTempToAllSubdirectories(sourceDirPath, tempDirPath, targetDirPath, ipAddress, share, noncriticalError);
 }
 
-void FileOperations::copyTempToAllSubdirectories(const QString &tempDirPath, const QString &targetDirPath, const QString& ipAddress, const QString& share) {
+void FileOperations::copyTempToAllSubdirectories(const QString &sourceDirPath, const QString &tempDirPath, const QString &targetDirPath, const QString& ipAddress, const QString& share, bool noncriticalError) {
     QDir tempDir(tempDirPath);
     QDir targetDir(targetDirPath);
 
     if (!tempDir.exists()) {
         qDebug() << "Temp directory does not exist: " << tempDirPath;
         emit debugInfo(ipAddress + ": temp directory does not exist.");
-        emit copyFinished(ipAddress, 2);
+        emit recieveError(ipAddress, "Temp error", "Can't find temp directory");
+        emit copyFinished(ipAddress, 1);
         return;
     }
 
     if (!targetDir.exists()) {
         qDebug() << "Target directory does not exist: " << targetDirPath;
         emit debugInfo(ipAddress + ": target directory does not exist.");
-        emit copyFinished(ipAddress, 2);
+        emit recieveError(ipAddress, "Target error", "Can't find target folder");
+        emit copyFinished(ipAddress, 1);
         return;
     }
 
@@ -156,7 +178,8 @@ void FileOperations::copyTempToAllSubdirectories(const QString &tempDirPath, con
         if (!destinationDir.exists()) {
             qDebug() << "Destination directory does not exist: " << destinationPath;
             emit debugInfo(ipAddress + ": destination directory does not exist.");
-            emit copyFinished(ipAddress, 2);
+            emit recieveError(ipAddress, "Target error", "Can't find subdirectory for copy");
+            noncriticalError = true;
             //Вставить еррор кейс
             continue;
         }
@@ -172,7 +195,10 @@ void FileOperations::copyTempToAllSubdirectories(const QString &tempDirPath, con
                     qDebug() << "Failed to remove existing file:" << destinationFilePath;
                     // Вставить еррор кейс
                     emit debugInfo(ipAddress + ": failed to remove existing file " + destinationFilePath);
-                    emit copyFinished(ipAddress, 2);
+                    QFileInfo fileInfo(destinationFilePath);
+                    QString fileName = fileInfo.fileName();
+                    emit recieveError(ipAddress, "Copy error", "Can't remove existing file " + fileName);
+                    noncriticalError = true;
                     continue;
                 }
             }
@@ -180,8 +206,10 @@ void FileOperations::copyTempToAllSubdirectories(const QString &tempDirPath, con
             if (!QFile::copy(sourceFilePath, destinationFilePath)) {
                 qDebug() << "Failed to copy file:" << sourceFilePath << "to" << destinationFilePath;
                 emit debugInfo(ipAddress + ": failed to copy file " + sourceFilePath + " to " + destinationFilePath);
-                emit copyFinished(ipAddress, 2);
-                // Вставить еррор кейс
+                noncriticalError = true;
+                QFileInfo fileInfo(sourceFilePath);
+                QString fileName = fileInfo.fileName();
+                emit recieveError(ipAddress, "Copy error", "Can't copy file " + fileName);
                 continue;
             }
 
@@ -189,38 +217,40 @@ void FileOperations::copyTempToAllSubdirectories(const QString &tempDirPath, con
             emit debugInfo(ipAddress + ": copied file " + sourceFilePath + " to " + destinationFilePath + " successfully.");
         }
     }
-    removeTempDirectory(tempDirPath, ipAddress, share);
+    removeTempDirectory(sourceDirPath, tempDirPath, ipAddress, share, noncriticalError);
 }
 
-void FileOperations::removeTempDirectory(QString tempDirPath, const QString& ipAddress, const QString& share) {
+void FileOperations::removeTempDirectory(const QString &sourceDirPath, QString tempDirPath, const QString& ipAddress, const QString& share, bool noncriticalError) {
     QDir tempDir(tempDirPath);
 
     if (tempDir.exists()) {
         if (!tempDir.removeRecursively()) {
             qDebug() << "Failed to remove temp directory: " << tempDirPath;
             emit debugInfo(ipAddress + ": failed to removed temp directory.");
-            emit copyFinished(ipAddress, 2);
+            emit recieveError(ipAddress, "Temp error", "Can't remove temp directory");
+            noncriticalError = true;
             // Добавить еррор кейс
-
         }
         qDebug() << "Removed temp directory:" << tempDirPath;
         emit debugInfo(ipAddress + ": removed temp directory successfully.");
     } else {
         qDebug() << "Temp directory does not exist: " << tempDirPath;
         emit debugInfo(ipAddress + ": temp directory does not exist.");
-        emit copyFinished(ipAddress, 2);
+        emit recieveError(ipAddress, "Temp error", "Can't find temp directory after copy");
+        noncriticalError = true;
         // Добавить еррор кейс
     }
-    updateVersionFile("C:\\Test\\copy\\source", tempDirPath.remove("\\temp"), ipAddress, share);
+    updateVersionFile(sourceDirPath, tempDirPath.remove("\\temp"), ipAddress, share, noncriticalError);
 }
 
-void FileOperations::updateVersionFile(const QString &sourceDirPath, const QString &destinationDirPath, const QString& ipAddress, const QString& share) {
+void FileOperations::updateVersionFile(const QString &sourceDirPath, const QString &destinationDirPath, const QString& ipAddress, const QString& share, bool noncriticalError) {
     QString filePath = destinationDirPath + "/version.txt";
     QFile file(filePath);
 
     if (!file.open(QIODevice::ReadWrite | QIODevice::Text)) {
         qDebug() << "Failed to open file for writing.";
         emit debugInfo(ipAddress + ": failed to open version file for writing.");
+        emit recieveError(ipAddress, "Version control error", "Can't open file for writing new version");
         emit copyFinished(ipAddress, 2);
         disconnectFromNetworkShare(ipAddress, share);
         return;
@@ -242,6 +272,7 @@ void FileOperations::updateVersionFile(const QString &sourceDirPath, const QStri
     if (!sourceDir.exists()) {
         qDebug() << "Source directory does not exist.";
         emit debugInfo(ipAddress + ": source directory " + sourceDirPath + " does not exist.");
+        emit recieveError(ipAddress, "Version control error", "Can't locate source directory for updating version file");
         file.close();
         emit copyFinished(ipAddress, 2);
         disconnectFromNetworkShare(ipAddress, share);
@@ -273,7 +304,12 @@ void FileOperations::updateVersionFile(const QString &sourceDirPath, const QStri
     file.close();
     qDebug() << "Finished updating file information.";
     emit debugInfo(ipAddress + ": finished updating file information.");
-    emit copyFinished(ipAddress, 0);
+    if (noncriticalError == false) {
+        emit copyFinished(ipAddress, 0);
+    } else {
+        emit copyFinished(ipAddress, 2);
+    }
+
     disconnectFromNetworkShare(ipAddress, share);
 }
 

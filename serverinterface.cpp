@@ -36,6 +36,40 @@ ServerInterface::ServerInterface(QWidget *parent) :
     } else {
         qDebug() << "Модель данных не найдена!";
     }
+    setWindowFlags(windowFlags() | Qt::CustomizeWindowHint |
+                              Qt::WindowMinimizeButtonHint |
+                              Qt::WindowMaximizeButtonHint |
+                              Qt::WindowCloseButtonHint);
+}
+
+void ServerInterface::recieveError(const QString& ipAddress, const QString& errorType, const QString& errorMessage) {
+    QMap<QString, QString> ipMap = model->getSelectedIPs();
+    // Проверяем, существует ли уже элемент для данного IP-адреса
+    QTreeWidgetItem* existingItem = nullptr;
+    for (int i = 0; i < ui->errorTreeWidget->topLevelItemCount(); ++i) {
+        QTreeWidgetItem* item = ui->errorTreeWidget->topLevelItem(i);
+        if (item->text(1) == ipAddress) {
+            existingItem = item;
+            break;
+        }
+    }
+
+    // Если элемент для данного IP-адреса не найден, создаем новый элемент
+    if (!existingItem) {
+        existingItem = new QTreeWidgetItem(ui->errorTreeWidget);
+        existingItem->setText(0, ipMap[ipAddress]);
+        existingItem->setText(1, ipAddress);
+    }
+
+    // Создаем новый элемент для отображения описания ошибки и добавляем его в качестве дочернего элемента
+    QTreeWidgetItem* errorItem = new QTreeWidgetItem(existingItem);
+    errorItem->setText(0, errorType); // Тип ошибки
+    errorItem->setText(1, errorMessage); // Сообщение об ошибке
+
+    // Разворачиваем родительский элемент, чтобы увидеть описание ошибки
+    existingItem->setExpanded(true);
+    ui->errorTreeWidget->resizeColumnToContents(0);
+    ui->errorTreeWidget->resizeColumnToContents(1);
 
 }
 
@@ -45,6 +79,8 @@ void ServerInterface::openProgressWindow() {
     connect(this, &ServerInterface::sendListSize, progress, &ProgressDialog::receiveListSize);
     connect(this, &ServerInterface::sendUpdateProgressBar, progress, &ProgressDialog::receiveUpdateProgressBar);
     progress->setAttribute(Qt::WA_DeleteOnClose); // для автоматического удаления окна после закрытия
+    // Установка флага Qt::Window, чтобы сделать диалог не модальным
+    progress->setWindowFlags(progress->windowFlags() | Qt::Window);
     progress->show();
 }
 
@@ -79,6 +115,7 @@ void ServerInterface::updateServerFiles(const bool closeFlag, const QString& log
 
             connect(&server, &FileOperations::debugInfo, this, &ServerInterface::receiveDebugInfo);
             connect(&server, &FileOperations::copyFinished, this, &ServerInterface::handleCopyFinished);
+            connect(&server, &FileOperations::recieveError, this, &ServerInterface::recieveError);
             server.connectToNetworkShare(IPAddress, "d$", login, password, closeFlag, source);
         }));
     }
@@ -219,7 +256,7 @@ void ServerInterface::spawnTable() {
 
 void ServerInterface::onSwitchToggled(bool checked) {
     Q_UNUSED(checked);
-        // Ваш код для обработки изменения состояния переключателя
+    filterInclude = !filterInclude;
 }
 
 void ServerInterface::spawnMenu() {
@@ -278,6 +315,10 @@ void ServerInterface::spawnMenu() {
     filterMenu->addAction(filterStatusAction2);
     filterMenu->addAction(filterStatusAction3);
     filterMenu->addAction(filterStatusAction4);
+    filterStatusAction1->setEnabled(false);
+    filterStatusAction2->setEnabled(false);
+    filterStatusAction3->setEnabled(false);
+    filterStatusAction4->setEnabled(false);
 
     // Добавляем фильтр для тэгов
     QLabel *titleLabel3 = new QLabel("Тагове:", this);
@@ -294,13 +335,11 @@ void ServerInterface::spawnMenu() {
     QAction *filterTagAction1 = new QAction("Клик", this);
     QAction *filterTagAction2 = new QAction("Пункт", this);
     QAction *filterTagAction3 = new QAction("Аптека", this);
-    QAction *filterTagAction4 = new QAction("Нов", this);
-    QAction *filterTagAction5 = new QAction("Затворен", this);
+
     filterMenu->addAction(filterTagAction1);
     filterMenu->addAction(filterTagAction2);
     filterMenu->addAction(filterTagAction3);
-    filterMenu->addAction(filterTagAction4);
-    filterMenu->addAction(filterTagAction5);
+
 
     // Устанавливаем выпадающее меню для кнопки и устанавливаем флаг ToolButtonPopupMode
     ui->filterButton->setMenu(filterMenu);
@@ -359,13 +398,6 @@ void ServerInterface::spawnMenu() {
         applyTagFilter("Аптека");
     });
 
-    connect(filterTagAction4, &QAction::triggered, [=]() {
-        applyTagFilter("Нов");
-    });
-
-    connect(filterTagAction5, &QAction::triggered, [=]() {
-        applyTagFilter("Затворен");
-    });
 }
 
 void ServerInterface::cancelFilter(QWidget *filterWidget) {
@@ -431,7 +463,14 @@ void ServerInterface::applyFilter(const QString &columnName, const QString &valu
     QPushButton *cancelButton = new QPushButton(filterWidget);
     QString cancelObjectName = "cancel" + filterObjectName;
     cancelButton->setObjectName(cancelObjectName);
-    cancelButton->setIcon(QIcon(":/buttons/icon/x-666666-color.svg"));
+
+
+    if (chosenOperator) {
+        cancelButton->setIcon(QIcon(":/buttons/icon/x-008631-color.svg"));
+    } else {
+        cancelButton->setIcon(QIcon(":/buttons/icon/x-BD2C36-color.svg"));
+    }
+
     cancelButton->setIconSize(QSize(10, 10));
     cancelButton->setFixedSize(20, 20);
     cancelButton->setCursor(Qt::PointingHandCursor);
@@ -452,7 +491,14 @@ void ServerInterface::applyFilter(const QString &columnName, const QString &valu
     if (chosenOperator) {
         query = " " + columnName + " LIKE '" + value + "'";
     } else {
-        query = " " + columnName + " = '" + value + "'";
+        query = " " + columnName + " NOT LIKE '" + value + "'";
+
+        // Устанавливаем стиль границы, фона и цвета текста в красный
+        QString styleSheet = QString("#%1 { border: 2px solid #D02C37; border-radius: 10px; background-color: #FFD6D6; }"
+                                     "#%1 QLabel { color: #BD2C36; }"
+                                     "#%1 QPushButton { background-color: transparent; }"
+                                     "#%1 QPushButton:hover { background-color: #FFC7C7; border: 2px solid #D02C37; }").arg(filterObjectName);
+        filterWidget->setStyleSheet(styleSheet);
     }
 
     // Добавляем информацию о фильтре в QMap
@@ -461,8 +507,9 @@ void ServerInterface::applyFilter(const QString &columnName, const QString &valu
 }
 
 
+
 void ServerInterface::applyCityFilter(const QString &city) {
-    applyFilter("IT", city, city, false);
+    applyFilter("IT", city, city, filterInclude);
 }
 
 void ServerInterface::applyStatusFilter(const QString &status) {
@@ -481,7 +528,7 @@ void ServerInterface::applyStatusFilter(const QString &status) {
         filterValue = "lg";
         displayText = "Грешки";
     }
-    applyFilter("a1", filterValue, displayText, false);
+    applyFilter("a1", filterValue, displayText, filterInclude);
 }
 
 void ServerInterface::applyTagFilter(const QString &tag) {
@@ -490,23 +537,23 @@ void ServerInterface::applyTagFilter(const QString &tag) {
     if (tag == "Клик") {
         filterValue = "%c%";
         displayText = "Клик";
-        applyFilter("mode", filterValue, displayText, true);
+        applyFilter("mode", filterValue, displayText, filterInclude);
     } else if (tag == "Пункт") {
         filterValue = "%b%";
         displayText = "Пункт";
-        applyFilter("Nkod", filterValue, displayText, true);
+        applyFilter("Nkod", filterValue, displayText, filterInclude);
     } else if (tag == "Аптека") {
         filterValue = "%a%";
         displayText = "Аптека";
-        applyFilter("Nkod", filterValue, displayText, true);
+        applyFilter("Nkod", filterValue, displayText, filterInclude);
     } else if (tag == "Нов") {
         filterValue = "%n%";
         displayText = "Нов";
-        applyFilter("mode", filterValue, displayText, true);
+        applyFilter("mode", filterValue, displayText, filterInclude);
     } else if (tag == "Затворен") {
         filterValue = "%s%";
         displayText = "Затворен";
-        applyFilter("mode", filterValue, displayText, true);
+        applyFilter("mode", filterValue, displayText, filterInclude);
     }
 }
 

@@ -27,7 +27,7 @@ void ProgressDialog::receiveUpdateProgressBar(){
 
 void ProgressDialog::receiveListSize(const int &listSize) {
     ui->progressBar->setRange(0, listSize);
-    ui->progressBar->setValue(1);
+    ui->progressBar->setValue(0);
 }
 
 
@@ -76,6 +76,6 @@ void ProgressDialog::on_exportButton_clicked()
 
 void ProgressDialog::on_closeButton_clicked()
 {
-
+    close();
 }
 
