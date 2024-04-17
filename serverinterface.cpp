@@ -1,5 +1,6 @@
 #include <confirmation.h>
 #include <fileoperations.h>
+#include "tableprinter.h"
 #include <QDebug>
 #include <QAction>
 #include <QBitmap>
@@ -7,6 +8,8 @@
 #include <QMenu>
 #include <QMessageBox>
 #include <QPainter>
+#include <QPrinter>
+#include <QPrintDialog>
 #include <QSql>
 #include <QSqlError>
 #include <QSqlQuery>
@@ -18,6 +21,7 @@
 #include "serverinterface.h"
 #include "progressdialog.h"
 #include "ui_serverinterface.h"
+#include "settings.h"
 
 ServerInterface::ServerInterface(QWidget *parent) :
     QMainWindow(parent),
@@ -25,21 +29,35 @@ ServerInterface::ServerInterface(QWidget *parent) :
 {
     ui->setupUi(this);
 
+    QString appDir = QCoreApplication::applicationDirPath();
+
+    // Создаем путь к файлу настроек в корневой папке приложения
+    QString settingsFilePath = appDir + "/settings.ini";
+
+    // Создаем объект QSettings с указанием пути к файлу настроек
+    QSettings mysettings(settingsFilePath, QSettings::IniFormat);
+
     spawnTable();
+
+    currentQuery = mysettings.value("query").toString();
+
     spawnMenu();
+
     ui->searchLine->installEventFilter(this);
 
-
-    model = qobject_cast<ObjectsTable*>(ui->tableView->model());
-    if (model) {
-        currentQuery = model->getQuery(); // Используем метод getQuery() из класса ObjectsTable
-    } else {
-        qDebug() << "Модель данных не найдена!";
-    }
     setWindowFlags(windowFlags() | Qt::CustomizeWindowHint |
                               Qt::WindowMinimizeButtonHint |
                               Qt::WindowMaximizeButtonHint |
                               Qt::WindowCloseButtonHint);
+    connect(model, &ObjectsTable::dataChanged, this, [this]() {
+        if (model->m_checkedCount == 0) {
+            ui->labelCheckedCount->setText("");
+        } else if (model->m_checkedCount == 1) {
+            ui->labelCheckedCount->setText("Избрано: " + QString::number(model->m_checkedCount) + " обект");
+        } else {
+            ui->labelCheckedCount->setText("Избрано: " + QString::number(model->m_checkedCount) + " обекта");
+        }
+    });
 }
 
 void ServerInterface::recieveError(const QString& ipAddress, const QString& errorType, const QString& errorMessage) {
@@ -88,9 +106,9 @@ void ServerInterface::receiveDebugInfo(const QString& info) {
     emit sendDebugInfoInProgress(info);
 }
 
-void ServerInterface::receiveData(const QString& newLogin, const QString& newPassword, const bool newFlag, const QString source) {
+void ServerInterface::receiveData(const QString& newLogin, const QString& newPassword, const bool newFlag, const QString source, const QString target, const bool straightCopyFlag) {
     qDebug() << newLogin << " " << newPassword << " " << newFlag << " " << source;
-    updateServerFiles(newFlag, newLogin, newPassword, source);
+    updateServerFiles(newFlag, newLogin, newPassword, source, target, straightCopyFlag);
 }
 
 
@@ -101,7 +119,7 @@ void ServerInterface::on_serverUpdateButton_clicked()
     dialog.exec();
 }
 
-void ServerInterface::updateServerFiles(const bool closeFlag, const QString& login, const QString& password, const QString source) {
+void ServerInterface::updateServerFiles(const bool closeFlag, const QString& login, const QString& password, const QString source, const QString target, const bool straightCopyFlag) {
 
     QMap<QString, QString> ipMap = model->getSelectedIPs();
     emit sendListSize(ipMap.size());
@@ -116,7 +134,7 @@ void ServerInterface::updateServerFiles(const bool closeFlag, const QString& log
             connect(&server, &FileOperations::debugInfo, this, &ServerInterface::receiveDebugInfo);
             connect(&server, &FileOperations::copyFinished, this, &ServerInterface::handleCopyFinished);
             connect(&server, &FileOperations::recieveError, this, &ServerInterface::recieveError);
-            server.connectToNetworkShare(IPAddress, "d$", login, password, closeFlag, source);
+            server.connectToNetworkShare(IPAddress, "IPC$", login, password, closeFlag, source, target, straightCopyFlag);
         }));
     }
 }
@@ -134,6 +152,7 @@ void ServerInterface::on_markSetManual_stateChanged(int arg1)
 {
     model->setMarkSetManualState(arg1 == Qt::Checked);
     ui->tableView->resizeColumnsToContents();
+    ui->checkAll->setEnabled(arg1 == Qt::Checked);
 }
 
 bool ServerInterface::eventFilter(QObject *obj, QEvent *event)
@@ -202,13 +221,80 @@ void ServerInterface::checkPingInMainThread(const QString &ipAddress) {
     // Проверка соединения происходит асинхронно, результаты будут обработаны в сигналах и слотах
 }
 
+QString ServerInterface::decryptPassword(const QString& encryptedPassword, const QString& key) {
+    QString decryptedPassword;
+    for (int i = 0; i < encryptedPassword.length(); ++i) {
+        decryptedPassword.append(QChar(encryptedPassword.at(i).unicode() ^ key.at(i % key.length()).unicode()));
+    }
+    return decryptedPassword;
+}
+
+void ServerInterface::refreshTable() {
+    QString appDir = QCoreApplication::applicationDirPath();
+
+    // Создаем путь к файлу настроек в корневой папке приложения
+    QString settingsFilePath = appDir + "/settings.ini";
+
+    // Создаем объект QSettings с указанием пути к файлу настроек
+    QSettings mysettings(settingsFilePath, QSettings::IniFormat);
+    // Выполняем запрос на получение данных из базы данных
+    QSqlQuery query;
+    if (!query.exec(mysettings.value("query").toString())) {
+        qDebug() << "Ошибка выполнения запроса:" << query.lastError().text();
+
+        // Создаем элемент в errorTreeWidget с текстом ошибки и добавляем его
+        QTreeWidgetItem *errorItem = new QTreeWidgetItem(ui->errorTreeWidget);
+        errorItem->setText(0, "Ошибка выполнения запроса");
+        errorItem->setText(1, query.lastError().text());
+        ui->errorTreeWidget->resizeColumnToContents(0);
+        ui->errorTreeWidget->resizeColumnToContents(1);
+        return;
+    }
+
+    // Устанавливаем SQL-запрос для модели
+    model->setQuery(query.lastQuery());
+
+    // Устанавливаем модель в QTableView
+    ui->tableView->setModel(model);
+
+    // Растягиваем столбцы по содержимому
+    ui->tableView->resizeColumnsToContents();
+
+    // Повторно подключаем сигнал о результате пинга к слоту обновления флага пинга
+    disconnect(this, SIGNAL(pingResult(QString,bool)), model, SLOT(updatePingFlag(QString,bool)));
+    connect(this, SIGNAL(pingResult(QString,bool)), model, SLOT(updatePingFlag(QString,bool)));
+
+    // Повторно проверяем пинг для всех IP адресов в базе данных
+    while (query.next()) {
+        QString ipAddress = query.value("IP").toString();
+        // Вызываем метод для выполнения проверки пинга в основном потоке
+        QMetaObject::invokeMethod(this, "checkPingInMainThread", Qt::QueuedConnection, Q_ARG(QString, ipAddress));
+    }
+
+    // Обновляем список руководителей
+    QSet<QString> leadersSet;
+    int rowCount = model->rowCount();
+    for (int i = 0; i < rowCount; ++i) {
+        QString leaderName = model->data(model->index(i, 3)).toString();
+        leadersSet.insert(leaderName);
+    }
+    this->leadersSet = leadersSet;
+}
 
 void ServerInterface::spawnTable() {
+    QString appDir = QCoreApplication::applicationDirPath();
+
+    // Создаем путь к файлу настроек в корневой папке приложения
+    QString settingsFilePath = appDir + "/settings.ini";
+
+    // Создаем объект QSettings с указанием пути к файлу настроек
+    QSettings mysettings(settingsFilePath, QSettings::IniFormat);
+
     QSqlDatabase db = QSqlDatabase::addDatabase("QMYSQL");
-    db.setHostName("192.168.0.115");
-    db.setDatabaseName("dev");
-    db.setUserName("global");
-    db.setPassword("");
+    db.setHostName(mysettings.value("server").toString());
+    db.setDatabaseName(mysettings.value("database").toString());
+    db.setUserName(mysettings.value("username").toString());
+    db.setPassword(decryptPassword(mysettings.value("password").toString(), key));
 
     if (!db.open()) {
         qDebug() << "Ошибка при подключении к базе данных:" << db.lastError().text();
@@ -217,20 +303,21 @@ void ServerInterface::spawnTable() {
         QTreeWidgetItem *errorItem = new QTreeWidgetItem(ui->errorTreeWidget);
         errorItem->setText(0, "Ошибка при подключении к базе данных");
         errorItem->setText(1, db.lastError().text());
-
+        ui->errorTreeWidget->resizeColumnToContents(0);
+        ui->errorTreeWidget->resizeColumnToContents(1);
         return;
     }
-
     // Выполняем запрос на получение только нужных столбцов из базы данных
     QSqlQuery query;
-    if (!query.exec("SELECT Obekt, IT, IP, a1, a2 FROM acc_blank")) {
+    if (!query.exec(mysettings.value("query").toString())) {
         qDebug() << "Ошибка выполнения запроса:" << query.lastError().text();
 
         // Создаем элемент в errorTreeWidget с текстом ошибки и добавляем его
         QTreeWidgetItem *errorItem = new QTreeWidgetItem(ui->errorTreeWidget);
         errorItem->setText(0, "Ошибка выполнения запроса");
         errorItem->setText(1, query.lastError().text());
-
+        ui->errorTreeWidget->resizeColumnToContents(0);
+        ui->errorTreeWidget->resizeColumnToContents(1);
         return;
     }
 
@@ -251,6 +338,15 @@ void ServerInterface::spawnTable() {
         // Вызываем метод для выполнения проверки пинга в основном потоке
         QMetaObject::invokeMethod(this, "checkPingInMainThread", Qt::QueuedConnection, Q_ARG(QString, ipAddress));
     }
+    QSet<QString> leadersSet;
+    int rowCount = model->rowCount();
+    for (int i = 0; i < rowCount; ++i) {
+        // Получение имени руководителя из модели данных
+        QString leaderName = model->data(model->index(i, 3)).toString();
+        // Добавление имени руководителя в сет
+        leadersSet.insert(leaderName);
+    }
+    this->leadersSet = leadersSet;
 }
 
 
@@ -353,6 +449,32 @@ void ServerInterface::spawnMenu() {
 
     filterMenu->setStyleSheet(filterMenu->styleSheet() + styleSheet);
 
+    // Создаем меню
+    QMenu *nameFiltersMenu = new QMenu("Имена", filterMenu);
+
+    // Отключаем функцию "отрыва" меню
+    nameFiltersMenu->setTearOffEnabled(false);
+
+    // Привязываем меню к действиям, а не к виджету
+    nameFiltersMenu->setContextMenuPolicy(Qt::ActionsContextMenu);
+
+    // Создаем QAction для каждого имени в сете уникальных имен
+    for (const QString &name : leadersSet) {
+        QAction *nameAction = new QAction(name, nameFiltersMenu);
+        nameAction->setCheckable(true);
+        connect(nameAction, &QAction::triggered, [=](bool checked) {
+            if (checked) {
+                applyNameFilter(name); // Применяем фильтр при выборе имени
+            } else {
+                removeNameFilter(name); // Удаляем фильтр при отмене выбора имени
+            }
+        });
+        nameFiltersMenu->addAction(nameAction);
+    }
+
+    // Добавляем подменю с именами в основное меню фильтров
+    filterMenu->addMenu(nameFiltersMenu);
+
     // Добавляем соединения для фильтров
     connect(filterCityAction1, &QAction::triggered, [=]() {
         applyCityFilter("Варна");
@@ -400,6 +522,39 @@ void ServerInterface::spawnMenu() {
 
 }
 
+void ServerInterface::applyNameFilter(const QString &name) {
+    if (!selectedNamesSet.contains(name)) {
+        selectedNamesSet.insert(name);
+        updateFilter(); // После добавления имени обновляем фильтр
+    }
+    stupidTechnicans = buildNameFilterQuery();
+    qDebug() << stupidTechnicans;
+    updateFilter();
+}
+
+void ServerInterface::removeNameFilter(const QString &name) {
+    if (selectedNamesSet.contains(name)) {
+        selectedNamesSet.remove(name);
+        updateFilter(); // После удаления имени обновляем фильтр
+    }
+    stupidTechnicans = buildNameFilterQuery();
+    qDebug() << stupidTechnicans;
+    updateFilter();
+}
+
+QString ServerInterface::buildNameFilterQuery() {
+    QStringList nameFilters;
+    for (const QString &name : selectedNamesSet) {
+        QString nameFilter = QString("tehn LIKE '%1'").arg(name);
+        nameFilters.append(nameFilter);
+    }
+    QString nameFilterQuery;
+    if (!nameFilters.isEmpty()) {
+        nameFilterQuery = "(" + nameFilters.join(" OR ") + ")";
+    }
+    return nameFilterQuery;
+}
+
 void ServerInterface::cancelFilter(QWidget *filterWidget) {
     if (filterWidget) {
         // Удаляем виджет из контейнера
@@ -429,6 +584,18 @@ void ServerInterface::updateFilter() {
         }
         // Объединяем фильтры с помощью логического оператора AND
         newQuery += filters.join(" AND ");
+    }
+
+    if (!appliedFilters.isEmpty() && !stupidTechnicans.isEmpty()) {
+        // Если были, добавляем AND
+        newQuery += " AND";
+        // Добавляем условие с помощью оператора LIKE
+        newQuery += stupidTechnicans;
+    } else if (!stupidTechnicans.isEmpty()){
+        // Если не было, добавляем WHERE
+        newQuery += " WHERE";
+        // Добавляем условие с помощью оператора LIKE
+        newQuery += stupidTechnicans;
     }
 
     qDebug() << "Новый запрос:" << newQuery;
@@ -560,13 +727,12 @@ void ServerInterface::applyTagFilter(const QString &tag) {
 ServerInterface::~ServerInterface()
 {
     delete ui;
+    delete model;
 }
 
 
-
-/*
- *
- * это код для чека - анчека всех чекбоксов, потом въебашу куда то.
+void ServerInterface::on_checkAll_stateChanged(int arg1)
+{
     if (!model)
         return;
 
@@ -574,16 +740,37 @@ ServerInterface::~ServerInterface()
     if (arg1 == Qt::Checked) {
         // Обновляем данные в таблице
         for (int row = 0; row < model->rowCount(); ++row) {
-            QModelIndex index = model->index(row, 1); // Индекс второй колонки (с чекбоксами)
+            QModelIndex index = model->index(row, 0); // Индекс второй колонки (с чекбоксами)
             model->setData(index, Qt::Checked, Qt::CheckStateRole); // Устанавливаем состояние чекбокса
         }
     } else {
         // Если галочка не установлена
         // Обновляем данные в таблице
         for (int row = 0; row < model->rowCount(); ++row) {
-            QModelIndex index = model->index(row, 1); // Индекс второй колонки (с чекбоксами)
+            QModelIndex index = model->index(row, 0); // Индекс второй колонки (с чекбоксами)
             model->setData(index, Qt::Unchecked, Qt::CheckStateRole); // Снимаем галочку с чекбокса
         }
     }
-*/
+}
+
+void ServerInterface::on_printButton_clicked()
+{
+    model->printTable(this);
+}
+
+
+void ServerInterface::on_databaseButton_clicked()
+{
+    settings settingsDialog(this);
+    QObject::connect(&settingsDialog, &settings::okButtonClicked,
+                     this, &ServerInterface::spawnTable);
+    settingsDialog.exec();
+    //обновить таблицу
+}
+
+
+void ServerInterface::on_refreshTableButton_clicked()
+{
+    refreshTable();
+}
 

@@ -1,4 +1,4 @@
-QT       += core gui sql concurrent network
+QT       += core gui sql concurrent network printsupport
 greaterThan(QT_MAJOR_VERSION, 4): QT += widgets
 
 CONFIG += c++17
@@ -13,7 +13,9 @@ SOURCES += \
     objects_table.cpp \
     progressdialog.cpp \
     serverinterface.cpp \
-    switchbutton.cpp
+    settings.cpp \
+    switchbutton.cpp \
+    tableprinter.cpp
 
 HEADERS += \
     confirmation.h \
@@ -21,12 +23,15 @@ HEADERS += \
     objects_table.h \
     progressdialog.h \
     serverinterface.h \
-    switchbutton.h
+    settings.h \
+    switchbutton.h \
+    tableprinter.h
 
 FORMS += \
     confirmation.ui \
     progressdialog.ui \
-    serverinterface.ui
+    serverinterface.ui \
+    settings.ui
 
 TRANSLATIONS += \
     AUCTool_bg_BG.ts

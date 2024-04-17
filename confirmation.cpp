@@ -57,7 +57,9 @@ void Confirmation::on_confirmButton_clicked()
     QString login = ui->login->text();
     QString password = ui->password->text();
     bool closeDrugFlag = ui->checkDrug->isChecked();
-    QString source = ui->sourcePath->text();
+    source = ui->sourcePath->text();
+    target = ui->targetLineEdit->text();
+    bool straightCopyFlag = ui->checkSubfolders->isChecked();
 
     // Проверяем наличие логина
     if (login.isEmpty()) {
@@ -92,7 +94,7 @@ void Confirmation::on_confirmButton_clicked()
 
     // Отправка данных через сигнал
     emit openProgress();
-    emit sendData(login, password, closeDrugFlag, source);
+    emit sendData(login, password, closeDrugFlag, source, target, straightCopyFlag);
     accept();
 }
 
@@ -136,5 +138,23 @@ void Confirmation::on_declineButton_clicked()
 void Confirmation::on_sourcePath_textChanged(const QString &arg1)
 {
     source = ui->sourcePath->text();
+}
+
+
+void Confirmation::on_targetLineEdit_textChanged(const QString &arg1)
+{
+    target = ui->targetLineEdit->text();
+}
+
+
+void Confirmation::on_resetTargetButton_clicked()
+{
+    ui->targetLineEdit->setText("d$\\DRUG\\Users");
+}
+
+
+void Confirmation::on_checkSubfolders_stateChanged(int arg1)
+{
+
 }
 

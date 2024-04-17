@@ -18,7 +18,7 @@ public:
 
     void closeAndUpdateInBackground(const QString& sourcePath, const QStringList& ipAddresses, const QString& username, const QString& password, QVector<int> rowID);
 
-    void connectToNetworkShare(const QString& server, const QString& share, const QString& username, const QString& password, const bool closeFlag, const QString source);
+    void connectToNetworkShare(const QString& server, const QString& share, const QString& username, const QString& password, const bool closeFlag, const QString source, const QString target, const bool straightCopyFlag);
     void disconnectFromNetworkShare(const QString &ipAddress, const QString &share);
 
 private:
@@ -27,7 +27,8 @@ private:
     void removeTempDirectory(const QString &sourceDirPath, QString tempDirPath, const QString &ipAddress, const QString &share, bool noncriticalError);
     void updateVersionFile(const QString &sourceDirPath, const QString &targetDirPath, const QString &ipAddress, const QString &share, bool noncriticalError);
     void closeDrugProcess(const QString& ipAddress, const QString& share, const QString& username, const QString& password);
-
+    bool copyDirectory(const QString &sourceDirPath, const QString &destinationDirPath, const QString &ipAddress);
+    bool copyDirectoryContents(const QString &sourceDirPath, const QString &destinationDirPath, const QString &ipAddress, const QString &share);
 };
 
 #endif // FILEOPERATIONS_H

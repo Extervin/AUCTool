@@ -12,7 +12,7 @@ class Confirmation : public QDialog
 {
     Q_OBJECT
 signals:
-    void sendData(const QString& newLogin, const QString &newPassword, const bool newFlag, const QString source);
+    void sendData(const QString& newLogin, const QString &newPassword, const bool newFlag, const QString source, const QString target, const bool straightCopyFlag);
 
     void openProgress();
 
@@ -33,6 +33,12 @@ private slots:
 
     void on_sourcePath_textChanged(const QString &arg1);
 
+    void on_targetLineEdit_textChanged(const QString &arg1);
+
+    void on_resetTargetButton_clicked();
+
+    void on_checkSubfolders_stateChanged(int arg1);
+
 private:
 
     void updateFileListWidget();
@@ -47,7 +53,8 @@ private:
 
     QList<QString> *ipListPtr;
     QMap<QString, QString> ipMap;
-    QString source;
+    QString source = "";
+    QString target = "";
 };
 
 #endif // CONFIRMATION_H

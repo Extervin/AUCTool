@@ -7,6 +7,9 @@
 #include <QWidget>
 #include <QString>
 #include <QMap>
+#include <QSet>
+#include <QCheckBox>
+#include <QSettings>
 
 QT_BEGIN_NAMESPACE
 namespace Ui { class ServerInterface; }
@@ -22,13 +25,15 @@ public:
 public slots:
     void handleCopyFinished(const QString &ipAddress, const int &finishCode);
 
-    void receiveData(const QString& newLogin, const QString &newPassword, const bool newFlag, const QString source);
+    void receiveData(const QString& newLogin, const QString &newPassword, const bool newFlag, const QString source, const QString target, const bool straightCopyFlag);
 
     void receiveDebugInfo(const QString& info);
 
     void openProgressWindow();
 
     void recieveError(const QString& ipAddress, const QString& errorType, const QString& errorMessage);
+
+    void spawnTable();
 
 signals:
     void pingResult(const QString& ipAddress, bool pingSuccess);
@@ -41,7 +46,7 @@ signals:
 
 private slots:
     void onSwitchToggled(bool checked);
-    void spawnTable();
+
     void spawnMenu();
 
     void cancelFilter(QWidget *filterWidget);
@@ -56,12 +61,24 @@ private slots:
 
     void on_searchButton_clicked();
 
-    void updateServerFiles(const bool closeFlag, const QString &login, const QString &password, const QString source);
+    void updateServerFiles(const bool closeFlag, const QString &login, const QString &password, const QString source, const QString target, const bool straightCopyFlag);
 
     void on_markSetManual_stateChanged(int arg1);
     bool eventFilter(QObject *obj, QEvent *event);
 
     void on_serverUpdateButton_clicked();
+
+    void on_checkAll_stateChanged(int arg1);
+
+    void applyNameFilter(const QString &name);
+    void removeNameFilter(const QString &name);
+    void refreshTable();
+    QString buildNameFilterQuery();
+    void on_printButton_clicked();
+    QString decryptPassword(const QString& encryptedPassword, const QString& key);
+    void on_databaseButton_clicked();
+
+    void on_refreshTableButton_clicked();
 
 private:
     Ui::ServerInterface *ui;
@@ -72,14 +89,20 @@ private:
     int tagFilterIndex = 0;
     int filterIndex = 0;
 
+    QSet<QString> leadersSet;
+    QSet<QString> selectedNamesSet;
+    int currentSearchIndex = -1;
     QMap<QWidget*, QString> appliedFilters;
-    QString currentQuery = "SELECT Obekt, IT, IP, a1, a2 FROM acc_blank";
+    QString currentQuery = "";
 
+    QMap<QString, QCheckBox*> leaderCheckboxes;
+    QString key = "balls";
     QString login = "";
     QString password = "";
     bool closeDrugFlag = false;
     QList<QString> fileList;
     bool filterInclude = true;
+    QString stupidTechnicans = "";
 };
 
 #endif // SERVERINTERFACE_H

@@ -5,5 +5,9 @@
         <file>icon/x-666666-color.svg</file>
         <file>icon/x-008631-color.svg</file>
         <file>icon/x-BD2C36-color.svg</file>
+        <file>icon/rotate-left.svg</file>
+        <file>icon/printer.svg</file>
+        <file>icon/database.svg</file>
+        <file>icon/reload.svg</file>
     </qresource>
 </RCC>

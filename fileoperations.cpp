@@ -9,7 +9,61 @@ FileOperations::FileOperations(QObject *parent) : QObject(parent) {
 
 }
 
-void FileOperations::connectToNetworkShare(const QString& ipAddress, const QString& share, const QString& username, const QString& password, const bool closeFlag, const QString source) {
+/* bool FileOperations::copyDirectoryContents(const QString &sourceDirPath, const QString &destinationDirPath, const QString& ipAddress, const QString& share) {
+    QDir sourceDir(sourceDirPath);
+    QDir destinationDir(destinationDirPath);
+
+    if (!destinationDir.exists()) {
+        qDebug() << "Destination directory does not exist: " << destinationDirPath;
+        emit debugInfo(ipAddress + ": Destination directory does not exist. " + QDir(destinationDirPath).dirName());
+        emit recieveError(ipAddress, "Copy error", "Destination directory does not exist. " + QDir(destinationDirPath).dirName());
+        emit copyFinished(ipAddress, 1);
+        return false;
+    }
+
+    QStringList filesAndDirs = sourceDir.entryList(QDir::Dirs | QDir::Files | QDir::NoDotAndDotDot);
+    foreach (const QString &fileOrDir, filesAndDirs) {
+        QString sourcePath = sourceDir.filePath(fileOrDir);
+        QString destinationPath = destinationDir.filePath(fileOrDir);
+
+        if (QFileInfo(sourcePath).isDir()) {
+            // Если это директория, рекурсивно копируем ее содержимое
+            if (!copyDirectoryContents(sourcePath, destinationPath, ipAddress, share)) {
+                qDebug() << "Failed to copy directory contents: " << sourcePath << " to " << destinationPath;
+                emit debugInfo(ipAddress + ": Failed to copy directory contents: " + sourcePath + " " + destinationPath);
+                emit recieveError(ipAddress, "Copy error", "Failed to copy directory contents.");
+                emit copyFinished(ipAddress, 1);
+                return false;
+            }
+        } else {
+            // Если это файл, копируем его с заменой, если существует
+            if (QFile::exists(destinationPath)) {
+                if (!QFile::remove(destinationPath)) {
+                    qDebug() << "Failed to remove existing file: " << destinationPath;
+                    emit debugInfo(ipAddress + ": Failed to remove existing file: " + destinationPath);
+                    emit recieveError(ipAddress, "Copy error", "Failed to remove existing file.");
+                    emit copyFinished(ipAddress, 1);
+                    return false;
+                }
+            }
+
+            if (!QFile::copy(sourcePath, destinationPath)) {
+                qDebug() << "Failed to copy file: " << sourcePath << " to " << destinationPath;
+                emit debugInfo(ipAddress + ": Failed to copy file: " + sourcePath + " to " + destinationPath);
+                emit recieveError(ipAddress, "Copy error", "Failed to copy file.");
+                emit copyFinished(ipAddress, 1);
+                return false;
+            } else {
+                emit debugInfo(ipAddress + ": Copied file: " + sourcePath + " to " + destinationPath);
+            }
+        }
+    }
+    emit copyFinished(ipAddress, 0);
+    disconnectFromNetworkShare(ipAddress, share);
+    return true;
+} */
+
+void FileOperations::connectToNetworkShare(const QString& ipAddress, const QString& share, const QString& username, const QString& password, const bool closeFlag, const QString source, const QString target, const bool straightCopyFlag) {
     // Проверяем состояние подключения к сетевому ресурсу
     QString checkConnectionCommand = QString("net use \\\\%1\\%2").arg(ipAddress, share);
     QProcess checkProcess;
@@ -25,9 +79,9 @@ void FileOperations::connectToNetworkShare(const QString& ipAddress, const QStri
         // Выполняем действия, например, копирование файлов
         if (closeFlag) {
             closeDrugProcess(ipAddress, share, username, password);
-            copyFilesToTemp(source, QString("\\\\%1\\%2\\DRUG\\Users").arg(ipAddress, share), ipAddress, share);
+            copyFilesToTemp(source, QString("\\\\%1\\%2").arg(ipAddress, target), ipAddress, share);
         } else {
-            copyFilesToTemp(source, QString("\\\\%1\\%2\\DRUG\\Users").arg(ipAddress, share), ipAddress, share);
+            copyFilesToTemp(source, QString("\\\\%1\\%2").arg(ipAddress, target), ipAddress, share);
         }
     } else {
         // Если не подключены, выполняем команду подключения
@@ -46,9 +100,9 @@ void FileOperations::connectToNetworkShare(const QString& ipAddress, const QStri
             // Выполняем действия после успешного подключения
             if (closeFlag) {
                 closeDrugProcess(ipAddress, share, username, password);
-                copyFilesToTemp(source, QString("\\\\%1\\%2\\DRUG\\Users").arg(ipAddress, share), ipAddress, share);
+                copyFilesToTemp(source, QString("\\\\%1\\%2").arg(ipAddress, target), ipAddress, share);
             } else {
-                copyFilesToTemp(source, QString("\\\\%1\\%2\\DRUG\\Users").arg(ipAddress, share), ipAddress, share);
+                copyFilesToTemp(source, QString("\\\\%1\\%2").arg(ipAddress, target), ipAddress, share);
             }
         } else {
             qDebug() << "Failed to connect to " + ipAddress + ".";
@@ -81,7 +135,6 @@ void FileOperations::closeDrugProcess(const QString& ipAddress, const QString& s
 
     emit debugInfo(resultMessage);
 }
-
 
 void FileOperations::copyFilesToTemp(const QString &sourceDirPath, const QString &targetDirPath, const QString& ipAddress, const QString& share) {
     QString tempDirPath = targetDirPath + "\\temp";
@@ -227,7 +280,7 @@ void FileOperations::removeTempDirectory(const QString &sourceDirPath, QString t
         if (!tempDir.removeRecursively()) {
             qDebug() << "Failed to remove temp directory: " << tempDirPath;
             emit debugInfo(ipAddress + ": failed to removed temp directory.");
-            emit recieveError(ipAddress, "Temp error", "Can't remove temp directory");
+            emit recieveError(ipAddress, "Temp error", "Can't remove temp directory after copy");
             noncriticalError = true;
             // Добавить еррор кейс
         }

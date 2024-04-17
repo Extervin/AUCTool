@@ -7,11 +7,13 @@
 #include <QVariant>
 #include <QSqlQueryModel>
 #include <QColor>
+#include <QPrinter>
 
 class ObjectsTable : public QAbstractTableModel
 {
     Q_OBJECT
-
+signals:
+    void checkedItemsChanged(int count);
 public slots:
     void updatePingFlag(const QString &ipAddress, bool pingSuccess);
 
@@ -36,10 +38,12 @@ public:
     QString getQuery() const;
     void setQuery(const QString &query);
     void addIPAddress(const QString &ipAddress);
-
+    int countCheckedItems() const;
+    void printTable(QWidget *parentWidget);
 
     QMap<QString, bool> m_pingFlags;
     QMap<QString, QColor> m_pingColors;
+    int m_checkedCount = 0;
 
 private:
     QSqlQueryModel *m_queryModel;
@@ -48,7 +52,7 @@ private:
     int m_lastUpdateResult;
     QMap<int, Qt::CheckState> m_checkStates; // Переменная для хранения состояний чекбоксов
     bool m_markSetManualState = false;
-    QMap<int, QColor> m_rowColors;
+    QMap<QString, QColor> m_rowColors;
 
 };
 

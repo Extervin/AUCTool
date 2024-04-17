@@ -4,6 +4,9 @@
 #include <QDebug>
 #include <QPainter>
 #include <QIcon>
+#include <QTableView>
+#include <QPrintDialog>
+#include "tableprinter.h"
 
 ObjectsTable::ObjectsTable(QObject *parent) : QAbstractTableModel(parent), m_queryModel(new QSqlQueryModel(this))
 {
@@ -74,22 +77,21 @@ int ObjectsTable::columnCount(const QModelIndex &parent) const
 }
 
 void ObjectsTable::updateRowColor(const QString &ipAddress, int resultCode) {
-    // Сохраняем айпи адрес и код завершения обновления
-    m_lastUpdatedIpAddress = ipAddress;
-    m_lastUpdateResult = resultCode;
+    // Сохраняем цвет строки для данного IP-адреса
+    m_rowColors[ipAddress] = getRowColor(resultCode);
 
-    // Ищем индекс строки по IP-адресу
+    // Обновляем отображение данных
+    QModelIndexList indexes;
     for (int row = 0; row < rowCount(); ++row) {
         QModelIndex ipIndex = index(row, 2);
         if (data(ipIndex, Qt::DisplayRole).toString() == ipAddress) {
-            // Если нашли соответствующий IP-адрес, сохраняем цвет строки
-            m_rowColors[row] = getRowColor(resultCode); // Получаем цвет строки в зависимости от результата обновления
-            // Оповещаем вид о необходимости обновить отображение данных
-            QModelIndex topLeft = index(row, 0);
-            QModelIndex bottomRight = index(row, columnCount() - 1);
-            emit dataChanged(topLeft, bottomRight);
-            return; // Завершаем поиск, когда нашли нужный IP-адрес
+            // Если нашли соответствующий IP-адрес, добавляем индексы ячеек для обновления
+            indexes << index(row, 0) << index(row, columnCount() - 1);
         }
+    }
+    // Оповещаем вид о необходимости обновить отображение данных
+    for (const QModelIndex& index : indexes) {
+        emit dataChanged(index, index);
     }
 }
 
@@ -103,8 +105,9 @@ QVariant ObjectsTable::data(const QModelIndex &index, int role) const
 
     if (role == Qt::BackgroundRole) {
         // Проверяем, есть ли сохраненный цвет для этой строки
-        if (m_rowColors.contains(row)) {
-            return m_rowColors[row]; // Возвращаем сохраненный цвет
+        QString ipAddress = m_queryModel->data(this->index(index.row(), 2)).toString();
+        if (m_rowColors.contains(ipAddress)) {
+            return m_rowColors[ipAddress]; // Возвращаем сохраненный цвет
         }
     } else if (role == Qt::DisplayRole) {
         return m_queryModel->data(this->index(index.row(), index.column()));
@@ -140,6 +143,7 @@ QVariant ObjectsTable::data(const QModelIndex &index, int role) const
     }
     return QVariant();
 }
+
 
 QVariant ObjectsTable::headerData(int section, Qt::Orientation orientation, int role) const
 {
@@ -188,6 +192,8 @@ bool ObjectsTable::setData(const QModelIndex &index, const QVariant &value, int 
     if (role == Qt::CheckStateRole && index.column() == 0) {
         // Устанавливаем состояние флажка для второй колонки
         m_checkStates[index.row()] = (value == Qt::Checked ? Qt::Checked : Qt::Unchecked);
+        // Обновляем количество отмеченных элементов
+        m_checkedCount = countCheckedItems();
         // Уведомляем о изменении данных
         emit dataChanged(index, index);
         return true;
@@ -202,15 +208,15 @@ QColor ObjectsTable::getRowColor(int resultCode) {
     switch(resultCode) {
     case 0:
         // Успешное обновление, зеленый цвет
-        color = QColor(76, 175, 80); // Зеленый цвет
+        color = QColor(168, 228, 160); // Зеленый цвет
         break;
     case 1:
         // Ошибка при обновлении, красный цвет
-        color = QColor(221, 0, 0); // Красный цвет
+        color = QColor(205, 92, 92); // Красный цвет
         break;
     case 2:
         // Частично успешное обновление, желтый цвет
-        color = QColor(255, 255, 0); // Желтый цвет
+        color = QColor(255, 219, 139); // Желтый цвет
         break;
     default:
         // По умолчанию, белый цвет
@@ -237,5 +243,49 @@ QMap<QString, QString> ObjectsTable::getSelectedIPs() const {
     return selectedIPsAndNamesMap;
 }
 
+int ObjectsTable::countCheckedItems() const {
+    int checkedCount = 0;
+    for (int row = 0; row < rowCount(); ++row) {
+        QModelIndex index = this->index(row, 0); // Индекс первой колонки (с чекбоксом)
+        if (data(index, Qt::CheckStateRole) == Qt::Checked) {
+            ++checkedCount;
+        }
+    }
+    return checkedCount;
+}
+
+void ObjectsTable::printTable(QWidget *parentWidget)
+{
+    // Создаем диалог печати
+    QPrintDialog printDialog(parentWidget);
+    if (printDialog.exec() == QDialog::Accepted) {
+        // Получаем указатель на принтер из диалога
+        QPrinter *printer = printDialog.printer();
+
+        // Создаем рисовальщика для принтера
+        QPainter painter;
+        if (!painter.begin(printer)) {
+            qDebug() << "Ошибка: не удалось начать печать";
+            return;
+        }
+
+        // Создаем экземпляр TablePrinter, передавая ему рисовальщика и принтер
+        TablePrinter tablePrinter(&painter, printer);
+
+        // Задаем растяжение столбцов. Здесь предполагается, что у нас есть информация о размере каждого столбца.
+        QVector<int> columnStretch = QVector<int>() << 6 << 2 << 4 << 10; // Замени это на фактические размеры столбцов
+
+        // Устанавливаем марджины на странице (отступы справа и слева)
+        tablePrinter.setPageMargin(50, 50, 20, 20); // Например, 50 мм справа и слева, 20 мм сверху и снизу
+
+        // Печатаем таблицу, используя модель запроса m_queryModel
+        if (!tablePrinter.printTable(m_queryModel, columnStretch)) {
+            qDebug() << "Ошибка при печати таблицы:" << tablePrinter.lastError();
+        }
+
+        // Завершаем рисование
+        painter.end();
+    }
+}
 
 
