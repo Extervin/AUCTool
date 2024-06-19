@@ -1,2 +1,2 @@
 # AUCTool
-Just a simple tool to archive, update and clear everything up in desired folders
+A crutch tool made specifically for sending files to specific folders to a large number of IP addresses.
